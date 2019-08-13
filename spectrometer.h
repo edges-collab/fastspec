@@ -6,8 +6,10 @@
 #include "accumulator.h"
 #include "digitizer.h"
 #include "channelizer.h"
+#include "controller.h"
 #include "switch.h"
 #include "timing.h"
+
 
 // ---------------------------------------------------------------------------
 //
@@ -25,6 +27,7 @@ class Spectrometer : public DigitizerReceiver, ChannelizerReceiver {
     Digitizer*      m_pDigitizer;
     Channelizer*    m_pChannelizer;
     Switch*         m_pSwitch;
+    Controller*     m_pController;    
     Accumulator     m_accumAntenna;
     Accumulator     m_accumAmbientLoad;
     Accumulator     m_accumHotLoad;
@@ -40,7 +43,6 @@ class Spectrometer : public DigitizerReceiver, ChannelizerReceiver {
     double          m_dStartFreq;               // MHz
     double          m_dStopFreq;                // MHz
     bool            m_bLocalStop;
-    bool*           m_pbGlobalStop;
     std::string     m_sOutput;
     std::string     m_sInstrument;
     bool            m_bDirectory;
@@ -61,7 +63,7 @@ class Spectrometer : public DigitizerReceiver, ChannelizerReceiver {
 
     // Constructor and destructor
     Spectrometer( unsigned long, unsigned long, double, double, 
-                  Digitizer*, Channelizer*, Switch*, bool* );
+                  Digitizer*, Channelizer*, Switch*, Controller* );
     ~Spectrometer();
 
     // Execution functions

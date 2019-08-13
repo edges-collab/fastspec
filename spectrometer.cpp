@@ -28,10 +28,8 @@ Spectrometer::Spectrometer(unsigned long uNumChannels,
                            Digitizer* pDigitizer,
                            Channelizer* pChannelizer,
                            Switch* pSwitch,
-                           bool* pbGlobalStop)
+                           Controller* pController)
 {
-
-  //using namespace std::placeholders;
 
   // User specified configuration
   m_uNumChannels = uNumChannels;
@@ -54,6 +52,9 @@ Spectrometer::Spectrometer(unsigned long uNumChannels,
   // Remember the receiver switch controller
   m_pSwitch = pSwitch;
 
+  // Remember the controller
+  m_pController = pController;
+
   // Initialize the Accumulators
   m_accumAntenna.init( m_uNumChannels, m_dStartFreq, 
                    m_dStopFreq, m_dChannelFactor );
@@ -65,7 +66,6 @@ Spectrometer::Spectrometer(unsigned long uNumChannels,
   m_pCurrentAccum = NULL;
 
   // Setup the stop flags
-  m_pbGlobalStop = pbGlobalStop;
   m_bLocalStop = false;
   m_bUseStopCycles = false;
   m_bUseStopSeconds = false;
@@ -168,8 +168,12 @@ void Spectrometer::run()
     dutyCycleTimer.tic();
     tk.setNow();
 
-    printf("Spectrometer: Starting cycle %lu at %s [total run time: %.0f seconds (%.3g days)]\n\n", 
-      uCycle, tk.getDateTimeString(5).c_str(), totalRunTimer.toc(), totalRunTimer.toc()/3600.0/24);
+    printf("----------------------------------------------------------------------\n");
+    printf("Spectrometer: Starting cycle %lu at %s\n", uCycle, tk.getDateTimeString(5).c_str());
+    printf("Spectrometer: Total run time so far: %.0f seconds (%.3g days)\n", 
+      totalRunTimer.toc(), totalRunTimer.toc()/3600.0/24);   
+    printf("----------------------------------------------------------------------\n");
+
 
     // Cycle between switch states
     for (unsigned int i=0; i<3; i++) {
@@ -230,7 +234,7 @@ void Spectrometer::run()
     
     // Write to ACQ
     writeTimer.tic();
-    printf("\nSpectrometer: Writing cycle data to file: %s\n", getFileName().c_str());
+    printf("\nSpectrometer: Writing to file: %s\n", getFileName().c_str());
     write_switch_cycle(getFileName(), m_accumAntenna, m_accumAmbientLoad, m_accumHotLoad);      
     writeTimer.toc();
 
@@ -278,10 +282,8 @@ bool Spectrometer::isAbort()
     return true;
   }
 
-  if (m_pbGlobalStop) {
-    if (*m_pbGlobalStop) {
-      return true;
-    }
+  if (m_pController) {
+    return m_pController->stop();
   }
 
   return false;

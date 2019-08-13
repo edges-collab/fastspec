@@ -3,38 +3,61 @@
 
 
 TARGET  := fastspec
-OBJS = *.o
-LIBS = -lsig_px14400 -lfftw3f -pthread -lrt
-CFLAGS = -Wall -O3 -mtune=native -std=c++0x -L/usr/lib
-MEZIO = -lwdt_dio -DMEZIO
-DOUBLE = -lfftw3 -DFFT_DOUBLE_PRECISION
-SIMULATE = -DSIMULATE
+INSTALL := /usr/local/bin
+SRCS = $(wildcard *.cpp)
+LIBS := -lsig_px14400 -lfftw3f -pthread -lrt
+CFLAGS := -Wall -O3 -mtune=native -std=c++0x -L/usr/lib
+MEZIO := -lwdt_dio -DMEZIO
+DOUBLE := -lfftw3 -DFFT_DOUBLE_PRECISION
 
-.PHONY : clean
+SIMULATE_SRCS = $(filter-out pxboard.cpp, $(SRCS))
+SIMULATE_LIBS = $(filter-out -lsig_px14400, $(LIBS)) -DSIMULATE
 
-single : *.cpp
-	@echo "Building "$(TARGET)" ("$@")..."	
-	@g++ $^ -o $(TARGET) $(CFLAGS) $(LIBS) 
-	chmod u+s $(TARGET)
+.PHONY : clean all
 
-double : *.cpp
+single : $(SRCS)
 	@echo "Building "$(TARGET)" ("$@")..."
-	@g++ $^ -o $(TARGET)_double $(CFLAGS) $(LIBS) $(DOUBLE)
-	chmod u+s $(TARGET)_double
+	@g++ $^ -o $(TARGET)_$@ $(CFLAGS) $(LIBS) 
+	chmod u+s $(TARGET)_$@
+	cp $(TARGET)_$@ $(INSTALL)/$(TARGET)_$@
+	chmod 755 $(INSTALL)/$(TARGET)_$@
+	chmod u+s $(INSTALL)/$(TARGET)_$@
+	@echo "Done."
 
-mezio : *.cpp
+double : $(SRCS)
 	@echo "Building "$(TARGET)" ("$@")..."
-	@g++ $^ -o $(TARGET)_mezio $(CFLAGS) $(LIBS) $(MEZIO) 
-	chmod u+s $(TARGET)_mezio
+	@g++ $^ -o $(TARGET)_$@ $(CFLAGS) $(LIBS) $(DOUBLE)
+	chmod u+s $(TARGET)_$@
+	cp $(TARGET)_$@ $(INSTALL)/$(TARGET)_$@
+	chmod 755 $(INSTALL)/$(TARGET)_$@
+	chmod u+s $(INSTALL)/$(TARGET)_$@
+	@echo "Done."
 
-simulate : *.cpp
+mezio : $(SRCS)
 	@echo "Building "$(TARGET)" ("$@")..."
-	@g++ $^ -o $(TARGET)_simulate $(CFLAGS) $(LIBS) $(SIMULATE)
-	chmod u+s $(TARGET)_simulate	
+	@g++ $^ -o $(TARGET)_$@ $(CFLAGS) $(LIBS) $(MEZIO) 
+	chmod u+s $(TARGET)_$@
+	cp $(TARGET)_$@ $(INSTALL)/$(TARGET)_$@
+	chmod 755 $(INSTALL)/$(TARGET)_$@
+	chmod u+s $(INSTALL)/$(TARGET)_$@
+	@echo "Done."
 
-all : single double simulate mezio
+simulate : $(SIMULATE_SRCS)
+	@echo "Building "$(TARGET)" ("$@")..."
+	@g++ $^ -o $(TARGET)_$@ $(CFLAGS) $(SIMULATE_LIBS)
+	chmod u+s $(TARGET)_$@
+	cp $(TARGET)_$@ $(INSTALL)/$(TARGET)_$@
+	chmod 755 $(INSTALL)/$(TARGET)_$@
+	chmod u+s $(INSTALL)/$(TARGET)_$@
+	@echo "Done."
+
+all : single double mezio simulate
 
 clean :
 	@echo "Cleaning "$(TARGET)"..."
 	@rm -f *~ *.o $(TARGET) $(TARGET)_*
+	@rm -f $(INSTALL)/$(TARGET) $(INSTALL)/$(TARGET)_*
+
+
+
 

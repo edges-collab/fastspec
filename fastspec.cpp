@@ -23,45 +23,15 @@
 #include "spectrometer.h"
 #include "switch.h"
 #include "utility.h"
+#include "controller.h"
 #include <fstream>      // ifstream, ofstream, ios
-#include <functional>   // std::bind
-#include <signal.h>     // sigaction
 
 
+Controller ctrl;
 
-// ----------------------------------------------------------------------------
-// Global setup for handling SIGINT (Ctrl-c) signals 
-// ----------------------------------------------------------------------------
-
-static bool bStopSignal = false;
-
-void on_signal(int iSignalNumber)
-{
-  printf("\n");
-  printf("*** SIGINT received ***\n");
-  printf("\n");
-  printf("Program will exit at the conclusion of the accumulation.\n");
-  printf("\n");
-  printf("This can be invoked by pressing CTRL-C in the execution\n");
-  printf("terminal or by running the command 'kill -s SIGINT <PID>'\n");
-  printf("with the appropriate processes ID <PID> from another\n");
-  printf("terminal.\n");
-  printf("\n");
-
-  // Set the stop flag
-  bStopSignal = true;
+void on_signal(int iSignalNumber) {
+  ctrl.onSignal(iSignalNumber);
 }
-
-void register_signal() 
-{
-  // Change the signal action to use our onSignal() callback
-  struct sigaction sAction;
-  sAction.sa_handler = on_signal;
-  sAction.sa_flags = SA_RESTART;
-  sigemptyset(&sAction.sa_mask);
-  sigaction(SIGINT,&sAction, NULL);
-}
-
 
 
 // ----------------------------------------------------------------------------
@@ -155,8 +125,10 @@ int main(int argc, char* argv[])
     unsigned long uStopCycles = 0;
     double dStopSeconds = 0;
     string sStopTime;
+    int iCtrlMode = CTRL_MODE_START;
 
     setbuf(stdout, NULL);
+
 
     // -----------------------------------------------------------------------
     // Parse the command line 
@@ -195,7 +167,17 @@ int main(int argc, char* argv[])
         if (argc > i) {
           sStopTime = argv[i+1];
         }
+      } else if (sArg.compare("stop") == 0) {
+        iCtrlMode = CTRL_MODE_STOP;
       }
+    }
+
+    // -----------------------------------------------------------------------
+    // Initialize the process controller (which is declared globally at top)
+    // -----------------------------------------------------------------------
+    ctrl.registerHandler(on_signal);
+    if (!ctrl.run(iCtrlMode)) {
+      return 0;
     }
 
     // -----------------------------------------------------------------------
@@ -309,12 +291,6 @@ int main(int argc, char* argv[])
     }
 
     // -----------------------------------------------------------------------
-    // Register our override of ctrl-c and kill -s SIGINT. The global 
-    // variable bStopSignal will turn true when an interrupt is received.
-    // -----------------------------------------------------------------------
-    register_signal();
-
-    // -----------------------------------------------------------------------
     // Initialize the receiver switch
     // -----------------------------------------------------------------------   
     SWITCH sw; 
@@ -360,8 +336,8 @@ int main(int argc, char* argv[])
                        dSwitchDelay,
                        (Digitizer*) &dig,
                        (Channelizer*) &chan,
-                       &sw, 
-                       &bStopSignal );
+                       (Switch*) &sw, 
+                       &ctrl );
 
     spec.setOutput(sOutput, sInstrument, bDirectory);
 
@@ -371,7 +347,8 @@ int main(int argc, char* argv[])
 
 
     // -----------------------------------------------------------------------
-    // Take data until a SIGINT is received
+    // Take data until the controller tell us it is time to stop
+    // (usually when a SIGINT is received)
     // -----------------------------------------------------------------------    
     spec.run();
 
