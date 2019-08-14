@@ -2,6 +2,7 @@
 #define _CONTROLLER_H_
 
 #define PID_FILE "/tmp/fastspec.pid"
+#define PROC_DIR "/proc"
 
 #define CTRL_MODE_NOTSET        0
 #define CTRL_MODE_START         1
@@ -67,8 +68,16 @@ class Controller {
 
       m_iMode = iMode;
 
-      // Get the PID of an existance instance if it exists
-      pid_t oldpid = readPID();
+      // Check for an existing instance
+      pid_t oldpid;
+      unsigned long long oldtime;
+
+      bool bExistingFile = readControlFile(oldpid, oldtime);
+      bool bExistingProc = bExistingFile                              // A control file exists
+                            && (oldpid != 0)                          // A reasonable old PID was found in the file
+                            && (kill(oldpid, 0) == 0)                 // The old PID is currently running and accessible
+                            && (oldtime == getProcStart(oldpid));     // Retrieving the starttime for the old PID now matches what is recorded in the file
+
 
       // Execute
       switch (iMode) {
@@ -76,25 +85,23 @@ class Controller {
         // Start execution
         case CTRL_MODE_START:
 
-          // Write our pid to file if there isn't a valid pid already there
-          if ((oldpid == 0) || (kill(oldpid, 0) != 0)) {
-            printf("Controller: Writing this PID (%d) to " PID_FILE "\n", getpid());
-            writePID();
-            return true;
-          } else {
+          // Abort if valid existing process, otherwise record our process info
+          if (bExistingProc) {
             return false;
+          } else {
+            printf("Controller: Writing this PID (%d) to " PID_FILE "\n", getpid());
+            writeControlFile();
+            return true;
           }
           break;
 
         // Stop execution of an existing instance if a valid pid exists
         case CTRL_MODE_STOP:
 
-          if (oldpid != 0) {
-            if (kill(oldpid, 0) == 0) {
-              printf("Controller: Sending stop signal to previous PID (%d)\n", oldpid);
-              sendStopSignal(oldpid);
-              return false;
-            } 
+          if (bExistingProc) {
+            printf("Controller: Sending stop signal to previous PID (%d)\n", oldpid);
+            sendStopSignal(oldpid);
+            return false;
           }
           
           printf("Controller: No valid existing instance found\n");
@@ -147,32 +154,40 @@ class Controller {
   private: 
 
     // (Over)write PID to file
-    void writePID() {
+    bool writeControlFile() {
 
-      std::ofstream pidFile;
-
-      pidFile.open(PID_FILE);
-      if (pidFile.is_open()) {
-        pidFile << getpid();
-        pidFile.close();
+      std::ofstream fs;
+      fs.open(PID_FILE);
+      if (fs.is_open()) {
+        fs << getpid() << " ";
+        fs << getProcStart(getpid());
+        fs.close();
+        return true;
       }
+
+      return false;
     }
 
 
-    // Read existing PID file
-    pid_t readPID() {
+    // Read existing control file and get its contained pid and starttime.
+    // Returns false if can't open the file
+    bool readControlFile(pid_t& pid, unsigned long long& tm) {
 
-      pid_t pid = 0;
-      std::ifstream pidFile;
+      pid = 0;
+      tm = 0;
 
-      pidFile.open(PID_FILE);
-      if (!pidFile.is_open()) {
-        return 0;
+      std::ifstream fs;
+      fs.open(PID_FILE);
+      if (!fs.is_open()) {
+        return false;
       } 
 
-      pidFile >> pid;
-      pidFile.close();
-      return pid;
+      fs >> pid;
+      fs >> tm;
+
+      fs.close();
+      
+      return true;
     }
 
 
@@ -180,6 +195,30 @@ class Controller {
     void deletePID() {
       std::remove(PID_FILE);
     }
+
+
+    // Get the start time associated with a PID
+    unsigned long long getProcStart(pid_t pid) {
+      
+      std::ifstream ifs;
+      std::string str(PROC_DIR "/");
+
+      ifs.open(str + std::to_string(pid) + "/stat");
+      if (!ifs.is_open()) {
+        return 0;
+      } 
+
+      // Read through the file until we get to the 
+      // 22nd entry, which is the starttime
+      for (int i=0; i<22; i++) {
+        ifs >> str;
+      }
+      ifs.close();
+
+      return stoull(str);
+    }
+
+
 
     // Sends the stop signal
     int sendStopSignal(pid_t pid) {
