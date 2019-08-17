@@ -233,9 +233,17 @@ void Spectrometer::run()
     m_accumHotLoad.setADCmax(m_accumHotLoad.getADCmax()/2);
     
     // Write to ACQ
-    writeTimer.tic();
+    writeTimer.tic();;
     printf("\nSpectrometer: Writing to file: %s\n", getFileName().c_str());
     write_switch_cycle(getFileName(), m_accumAntenna, m_accumAmbientLoad, m_accumHotLoad);      
+    //writeTimer.toc();
+
+    // Write a file for plotting
+    if (m_pController->plot()) {
+      printf("Spectrometer: Writing to plot file: /tmp/fastspec.dat\n");
+      write_for_plot(m_pController->plotPath(), m_accumAntenna, m_accumAmbientLoad, m_accumHotLoad, 4);
+      m_pController->updatePlotter();
+    }
     writeTimer.toc();
 
     // Calculate overall duty cycle
@@ -258,6 +266,7 @@ void Spectrometer::run()
     printf("Spectrometer: p1 (ambient) -- acdmin = %6.3f,  adcmax = %6.3f\n", m_accumAmbientLoad.getADCmin(), m_accumAmbientLoad.getADCmax());
     printf("Spectrometer: p2 (hot)     -- acdmin = %6.3f,  adcmax = %6.3f\n", m_accumHotLoad.getADCmin(), m_accumHotLoad.getADCmax());
     printf("\n");
+
   }
 
   // Print closing info

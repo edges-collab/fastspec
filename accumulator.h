@@ -87,6 +87,7 @@ class Accumulator {
     }
     
     void addDrops(unsigned long uDrops) { m_uDrops += uDrops; }
+    
     void clear() 
     {
       // Set the spectrum to zeros

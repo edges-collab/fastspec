@@ -41,9 +41,27 @@ void print_help()
 {
   printf("\n");
   printf("| ------------------------------------------------------------------------\n");
-  printf("| EDGES Spectrometer\n");
-  printf("| ------------------------------------------------------------------------\n");  
-  printf("\n");
+  printf("| FASTSPEC - HELP\n");
+  printf("| ------------------------------------------------------------------------\n\n"); 
+
+  printf("FASTPEC is a spectrometer for the EDGES instrument.  It controls the\n");
+  printf("receiver switch states and acquires samples from an analog-to-digital\n");
+  printf("converter (ADC) and sends them through a polyphase filter bank (PFB) for\n");
+  printf("channelization.  Channelization is multi-threaded. Accumulated spectra\n");
+  printf("are stored to disk in an .acq file.\n\n");
+
+  printf("FASTSPEC accepts many configuration settings, all of which are available\n");
+  printf("through command line arguments and by using a .ini configuration file.\n");
+  printf("The list of configuration settings printed above shows all of the\n");
+  printf("options supported.  The first term (e.g. 'Spectrometer') provides the .ini\n");
+  printf("section under which the option is stored.  The second term (e.g. '-p') is\n");
+  printf("a shorthand command line flag for setting a parameter value.  The third\n");
+  printf("term (e.g. 'show_plots') provides the paramater name in the .ini file.\n");
+  printf("It can also be used on the command line as '--show_plots [value]'.\n");
+  printf("Command line flags override any value provided in a .ini file.\n\n");
+
+  printf("Some key parameters are:\n\n");
+
   printf("-f        Specify an output file.  If not specified, output files are\n");
   printf("          determined from the datadir parameter in the config file.\n");
   printf("\n");
@@ -51,14 +69,19 @@ void print_help()
   printf("\n");
   printf("-i        Specify the .ini configuration file.  If not specified, the\n");
   printf("          default configuration file is tried: \n\n");
-  printf("               " DEFAULT_INI_FILE "\n");
-  printf("\n");
-  printf("stop      Send stop signal to any running spectrometer processes.\n");
-  printf("\n");
+
+  printf("               " DEFAULT_INI_FILE "\n\n");
+
+  printf("FASTSPEC can also be called to control the behavior of an already running\n");
+  printf("instance.  Three commands are supported:\n\n");
+
+  printf("hide      Send HIDE PLOTS signal to a currently running FASTSPEC instance.\n");
+  printf("show      Send SHOW PLOTS signal to a currently running FASTSPEC instance.\n");
+  printf("stop      Send STOP signal to a currently running FASTSPEC instance.\n\n");
 }
 
 
-
+/*
 // ----------------------------------------------------------------------------
 // print_config - Print configuration to terminal
 // ----------------------------------------------------------------------------
@@ -111,7 +134,7 @@ void print_config( const string& sConfigFile, const string& sSite,
   printf("\n");
 }
 
-
+*/
 
 
 // ----------------------------------------------------------------------------
@@ -119,129 +142,87 @@ void print_config( const string& sConfigFile, const string& sSite,
 // ----------------------------------------------------------------------------
 int main(int argc, char* argv[])
 {   
-    string sConfigFile(DEFAULT_INI_FILE);
-    string sOutput;
-    bool bDirectory = true;
-    unsigned long uStopCycles = 0;
-    double dStopSeconds = 0;
-    string sStopTime;
-    int iCtrlMode = CTRL_MODE_START;
-
+    // Don't buffer stdout (so we see messages without lag)
     setbuf(stdout, NULL);
 
+    printf("\n");
+    printf("| ------------------------------------------------------------------------\n");
+    printf("| FASTSPEC\n");
+    printf("| ------------------------------------------------------------------------\n");
+    printf("\n");  
 
-    // -----------------------------------------------------------------------
-    // Parse the command line 
-    // -----------------------------------------------------------------------
-    for(int i=0; i<argc; i++)
-    {
-      string sArg = argv[i];
-
-      if (sArg.compare("-f") == 0) { 
-        // Specify an output filepath instead of the usual directory structure
-        if (argc > i) {
-          sOutput = argv[i+1]; 
-          bDirectory = false;
-        }
-      } else if (sArg.compare("-h") == 0) { 
-        // Show help text
-        print_help();
-        return 0;
-      } else if (sArg.compare("-i") == 0) { 
-        // Specify a config file at a different path than the default path
-        if (argc > i) {
-          sConfigFile = argv[i+1];
-        } 
-      } else if (sArg.compare("-c") == 0) { 
-        // Stop after cycles
-        if (argc > i) {
-          uStopCycles = strtoul(argv[i+1], NULL, 10);
-        }
-      } else if (sArg.compare("-s") == 0) { 
-        // Stop after seconds since start
-        if (argc > i) {
-          dStopSeconds = strtof(argv[i+1], NULL);
-        }
-      } else if (sArg.compare("-t") == 0) {
-        // Stop at specific time
-        if (argc > i) {
-          sStopTime = argv[i+1];
-        }
-      } else if (sArg.compare("stop") == 0) {
-        iCtrlMode = CTRL_MODE_STOP;
-      }
-    }
 
     // -----------------------------------------------------------------------
     // Initialize the process controller (which is declared globally at top)
     // -----------------------------------------------------------------------
     ctrl.registerHandler(on_signal);
+    ctrl.setArgs(argc, argv);
+
+    // Start in the commanded mode 
+    int iCtrlMode = CTRL_MODE_START;
+    iCtrlMode = ctrl.getOptionBool("[ARGS]", "stop", "stop", false) ? CTRL_MODE_STOP : iCtrlMode;
+    iCtrlMode = ctrl.getOptionBool("[ARGS]", "show", "show", false) ? CTRL_MODE_SHOW : iCtrlMode;
+    iCtrlMode = ctrl.getOptionBool("[ARGS]", "hide", "hide", false) ? CTRL_MODE_HIDE : iCtrlMode;
+
     if (!ctrl.run(iCtrlMode)) {
       return 0;
     }
 
+
     // -----------------------------------------------------------------------
-    // Parse the Spectrometer configuration .ini file
+    // Parse the configuration options from command line and INI file
     // -----------------------------------------------------------------------
-    INIReader reader(sConfigFile);
 
-    if (reader.ParseError() < 0) {
-      printf("Failed to parse .ini config file.  Abort.\n");
-      return 1;
+    string sConfigFile = ctrl.getOptionStr("[ARGS]", "inifile", "-i", string(DEFAULT_INI_FILE));
+
+    if (!ctrl.setINI(sConfigFile)) {
+      printf("Failed to parse .ini config file -- Using only command line\n");
+      printf("arguments and default values.\n");
     }
 
-    string sDataDir = reader.Get("Installation", "datadir", "");
-    string sSite = reader.Get("Installation", "site", "");
-    string sInstrument = reader.Get("Installation", "instrument", "");
-    unsigned int uSwitchIOPort = reader.GetInteger("Spectrometer", "switch_io_port", 0x3010);
-    double dSwitchDelay = reader.GetReal("Spectrometer", "switch_delay", 0.5);
-    unsigned int uInputChannel = reader.GetInteger("Spectrometer", "input_channel", 2);
-    unsigned int uNumChannels = reader.GetInteger("Spectrometer", "num_channels", 65536);
-    unsigned long uSamplesPerAccum = reader.GetInteger("Spectrometer", "samples_per_accumulation", 1024L*2L*1024L*1024L);
-    unsigned int uSamplesPerTransfer = reader.GetInteger("Spectrometer", "samples_per_transfer", 2*1024*1024);
-    unsigned int uVoltageRange = reader.GetInteger("Spectrometer", "voltage_range", 0);
-    double dAcquisitionRate = reader.GetReal("Spectrometer", "acquisition_rate", 400);
-    unsigned int uNumThreads = reader.GetInteger("Spectrometer", "num_fft_threads", 4);
-    unsigned int uNumBuffers = reader.GetInteger("Spectrometer", "num_fft_buffers", 400);
-    unsigned int uNumTaps = reader.GetInteger("Spectrometer", "num_taps", 1);
-    unsigned int uWindowFunctionId = reader.GetInteger("Spectrometer", "window_function_id", 1);
-    bool bStoreConfig = reader.GetBoolean("Spectrometer", "store_config", false);
+    string sDataDir           = ctrl.getOptionStr("Installation", "datadir", "-d", "");
+    string sSite              = ctrl.getOptionStr("Installation", "site", "-z", "");
+    string sInstrument        = ctrl.getOptionStr("Installation", "instrument", "-j", "");
+    string sOutput            = ctrl.getOptionStr("Spectrometer", "output_file", "-f", "");
+    long uSwitchIOPort        = ctrl.getOptionInt("Spectrometer", "switch_io_port", "-o", 0x3010);
+    double dSwitchDelay       = ctrl.getOptionReal("Spectrometer", "switch_delay", "-e", 0.5);
+    long uInputChannel        = ctrl.getOptionInt("Spectrometer", "input_channel", "-l", 2);
+    long uNumChannels         = ctrl.getOptionInt("Spectrometer", "num_channels", "-n", 65536);
+    long uSamplesPerAccum     = ctrl.getOptionInt("Spectrometer", "samples_per_accumulation", "-a", 1024L*2L*1024L*1024L);
+    long uSamplesPerTransfer  = ctrl.getOptionInt("Spectrometer", "samples_per_transfer", "-t", 2*1024*1024);
+    long uVoltageRange        = ctrl.getOptionInt("Spectrometer", "voltage_range", "-v", 0);
+    double dAcquisitionRate   = ctrl.getOptionInt("Spectrometer", "acquisition_rate", "-r", 400);
+    long uNumThreads          = ctrl.getOptionInt("Spectrometer", "num_fft_threads", "-m", 4);
+    long uNumBuffers          = ctrl.getOptionInt("Spectrometer", "num_fft_buffers", "-b", 400);
+    long uNumTaps             = ctrl.getOptionInt("Spectrometer", "num_taps", "-q", 5);
+    long uWindowFunctionId    = ctrl.getOptionInt("Spectrometer", "window_function_id", "-w", 1);
+    bool bStoreConfig         = ctrl.getOptionBool("Spectrometer", "store_config", "-k", false);
+    long uStopCycles          = ctrl.getOptionInt("Spectrometer", "stop_cycles", "-c", 0); 
+    double dStopSeconds       = ctrl.getOptionReal("Spectrometer", "stop_seconds", "-s", 0);
+    string sStopTime          = ctrl.getOptionStr("Spectrometer", "stop_time", "-u", "");
+    bool bPlot                = ctrl.getOptionBool("Spectrometer", "show_plots", "-p", false);    
 
-    if (uStopCycles == 0) { 
-      uStopCycles = reader.GetInteger("Spectrometer", "stop_cycles", 0); 
+    // Handle help flag if set
+    if (ctrl.getOptionBool("[ARGS]", "help", "-h", false)) {
+      print_help();
+      return 0;
     }
-    if (dStopSeconds == 0) {
-      dStopSeconds = reader.GetReal("Spectrometer", "stop_seconds", 0);
-    }
-    if (sStopTime.empty()) {
-      string sStopTime = reader.Get("Spectrometer", "stop_time", "");
-    }
+
+    // Set controls
+    ctrl.setPlot(bPlot);
 
     // Calculate a few derived configuration parameters
     double dBandwidth = dAcquisitionRate / 2.0;
     unsigned int uNumFFT = uNumChannels * 2;
+    printf("Bandwidth: %6.2f\n", dBandwidth);        
+    printf("Samples per FFT: %d\n", uNumFFT);    
+    printf("\n");
+
+    bool bDirectory = sOutput.empty();
     if (bDirectory) { 
       sOutput = sDataDir + "/" + sSite + "/" + sInstrument; 
     }
 
-
-    // -----------------------------------------------------------------------
-    // Print the configuration to terminal
-    // ----------------------------------------------------------------------- 
-    //printf("INI File -- relevant settings\n\n");
-    //reader.Print(string("installation"));
-    //printf("\n");
-    //reader.Print(string("spectrometer"));
-    //printf("\n");
-
-    print_config( sConfigFile, sSite, sInstrument, sOutput, dAcquisitionRate, 
-                  dBandwidth, uInputChannel, uVoltageRange, uNumChannels, 
-                  uSamplesPerTransfer, uSamplesPerAccum, uSwitchIOPort, 
-                  dSwitchDelay, uNumFFT, uNumThreads, uNumBuffers, uNumTaps, 
-                  uWindowFunctionId, uStopCycles, dStopSeconds, sStopTime, 
-                  bStoreConfig );
-
-    
     // -----------------------------------------------------------------------
     // Check the configuration
     // -----------------------------------------------------------------------  
@@ -325,7 +306,7 @@ int main(int argc, char* argv[])
                uNumTaps );
 
     // Select the window function
-    chan.setWindowFunction(1);
+    chan.setWindowFunction(uWindowFunctionId);
 
     // -----------------------------------------------------------------------
     // Initialize the Spectrometer

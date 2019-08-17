@@ -2,6 +2,7 @@
 #include <string>
 #include <sys/stat.h> // stat
 #include <errno.h>    // errno, ENOENT, EEXIST
+#include <math.h>     // log10
 
 #include "utility.h"
 
@@ -113,6 +114,56 @@ string construct_filepath_name(const string& sBase,
 
 
 // ----------------------------------------------------------------------------
+// write_for_plot() -- Writes all three spectra from full switch cycle to 
+//                         a text file.  
+// ----------------------------------------------------------------------------
+bool write_for_plot( const string& sFilePath,
+                     Accumulator& acc0, 
+                     Accumulator& acc1, 
+                     Accumulator& acc2, 
+                     unsigned int uDecimate = 1)
+{
+
+  FILE* file;
+  ACCUM_TYPE* p0 = acc0.getSum();
+  ACCUM_TYPE* p1 = acc1.getSum();
+  ACCUM_TYPE* p2 = acc2.getSum();
+  double fstart = acc0.getStartFreq();
+  double fstop = acc0.getStopFreq();
+  double flength = (double) acc0.getDataLength();
+  double df = (fstop-fstart) / flength;
+  double accums = (double) acc0.getNumAccums();
+  double ta = 0;
+
+  //printf("fstart: %g, fstop: %g, df: %g\n", fstart, fstop, df);
+
+  if ((file = fopen (sFilePath.c_str(), "w")) == NULL) {
+    printf ("Error writing to .dat file.  Cannot write to: %s\n", sFilePath.c_str());
+    return false;
+  }
+
+  // Loop over the spectrum and calculate and write the desired outputs
+  // Col 1: frequency [MHz]
+  // Col 2: 10*log10(p0)
+  // Col 3: 10*log10(p1)
+  // Col 4: 10*log10(p2)
+  // Col 5: ta = 400*(p0-p1)/(p2-p1) + 300
+  for (unsigned int i = 0; i<acc0.getDataLength(); i+=uDecimate) {
+
+    ta = 400.0*(p0[i]-p1[i])/(p2[i]-p1[i])+300.0;
+
+    fprintf(file, "%10.5f %12g %12g %12g %12g\n", 
+      fstart+df*i, 10.0*log10(p0[i]/accums),
+      10.0*log10(p1[i]/accums), 10.0*log10(p2[i]/accums), ta);
+  }
+
+  fclose(file);
+  return true;
+}
+
+
+
+// ----------------------------------------------------------------------------
 // write_switch_cycle() -- Writes all three spectra from full switch cycle to 
 //                         ACQ file.  
 // ----------------------------------------------------------------------------
@@ -167,7 +218,8 @@ bool write_switch_cycle( const string& sFilePath,
                 dEffectiveChannelSize,
                 pAccum->getNumAccums(), 
                 pAccum->getADCmin(), pAccum->getADCmax(),
-                pAccum->getTemperature(), pAccum->getDrops() );
+                pAccum->getTemperature(), 
+                pAccum->getDrops() );
 
   }
 
@@ -242,8 +294,10 @@ bool append_to_acq(const char* pchFilename, const ACCUM_TYPE* pSpectrum,
   }
 
   // Write the ancillary data to the file
-  fprintf (file, "# swpos %d resolution %8.3f adcmax %8.5f adcmin %8.5f temp %2.0f C nblk %d nspec %d\n",
-            uSwitch, dEffectiveChannelSize, dADCmax, dADCmin, dTemp, uNumAccums, uLength);
+  // original acq file: fprintf (file, "# swpos %d resolution %8.3f adcmax %8.5f adcmin %8.5f temp %2.0f C nblk %d nspec %d\n",
+  //          uSwitch, dEffectiveChannelSize, dADCmax, dADCmin, dTemp, uNumAccums, uLength);
+  fprintf (file, "# swpos %d data_drops %8lu adcmax %8.5f adcmin %8.5f temp %2.0f C nblk %d nspec %d\n",
+            uSwitch, uDrops / uLength / 2, dADCmax, dADCmin, dTemp, uNumAccums, uLength);
 
   // Write the spectrum preamble to the file
   sprintf (txt, "%4d:%03d:%02d:%02d:%02d %1d %8.3f %8.6f %8.3f %4.1f spectrum ",

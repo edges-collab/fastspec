@@ -4,14 +4,14 @@
 
 TARGET  := fastspec
 INSTALL := /usr/local/bin
-SRCS = $(wildcard *.cpp)
+SRCS := $(filter-out gensamples.cpp, $(wildcard *.cpp))
 LIBS := -lsig_px14400 -lfftw3f -pthread -lrt
 CFLAGS := -Wall -O3 -mtune=native -std=c++0x -L/usr/lib
 MEZIO := -lwdt_dio -DMEZIO
 DOUBLE := -lfftw3 -DFFT_DOUBLE_PRECISION
 
-SIMULATE_SRCS = $(filter-out pxboard.cpp, $(SRCS))
-SIMULATE_LIBS = $(filter-out -lsig_px14400, $(LIBS)) -DSIMULATE
+SIMULATE_SRCS := $(filter-out pxboard.cpp, $(SRCS))
+SIMULATE_LIBS := $(filter-out -lsig_px14400, $(LIBS)) -DSIMULATE
 
 .PHONY : clean all
 
@@ -51,13 +51,22 @@ simulate : $(SIMULATE_SRCS)
 	chmod u+s $(INSTALL)/$(TARGET)_$@
 	@echo "Done."
 
+gensamples : gensamples.cpp
+	@echo "Building "$@"..."
+	@g++ $^ -o $@ $(CFLAGS) $(SIMULATE_LIBS)
+	cp $@ $(INSTALL)/$@
+	chmod 755 $(INSTALL)/$@
+	@echo "Done."
+
+
 all : single double mezio simulate
 
 clean :
 	@echo "Cleaning "$(TARGET)"..."
-	@rm -f *~ *.o $(TARGET) $(TARGET)_*
+	@rm -f *~ *.o $(TARGET) $(TARGET)_* 
 	@rm -f $(INSTALL)/$(TARGET) $(INSTALL)/$(TARGET)_*
-
+	@echo "Cleaning gensamples..."
+	@rm -f gensamples
 
 
 
