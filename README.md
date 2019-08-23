@@ -47,51 +47,52 @@ FASTSPEC accepts many configuration settings, all of which are available through
 * ([ARGS ONLY]) -h --help: 1
 * ([ARGS ONLY]) -i --inifile: ./fastspec.ini
 
-(Installation) -d --datadir: /home/user/data
-(Installation) -z --site: mro
-(Installation) -j --instrument: low1 
-(Spectrometer) -f --output_file: 
-(Spectrometer) -o --switch_io_port: 0x3010
-(Spectrometer) -e --switch_delay: 0.5
-(Spectrometer) -l --input_channel: 1 
-(Spectrometer) -v --voltage_range: 0 
-(Spectrometer) -a --samples_per_accumulation: 2147483648 
-(Spectrometer) -t --samples_per_transfer: 2097152
-(Spectrometer) -r --acquisition_rate: 400 
-(Spectrometer) -n --num_channels: 65536 
-(Spectrometer) -q --num_taps: 5 
-(Spectrometer) -w --window_function_id: 3 
-(Spectrometer) -m --num_fft_threads: 4 
-(Spectrometer) -b --num_fft_buffers: 400 
-(Spectrometer) -c --stop_cycles:  
-(Spectrometer) -s --stop_seconds: 
-(Spectrometer) -u --stop_time: YYYY/MM/DDThh:mm:ss [UTC]
-(Spectrometer) -p --show_plots: 0
-(Spectrometer) -B --plot_bin: 1 
-(Spectrometer) -F1 --sim_cw_freq1: 75
-(Spectrometer) -A1 --sim_cw_amp1: 0.03
-(Spectrometer) -F2 --sim_cw_freq2: 40
-(Spectrometer) -A2 --sim_cw_amp2: 0.02
-(Spectrometer) -AN --sim_noise_amp: 0.001
+* (Installation) -d --datadir: /home/user/data
+* (Installation) -z --site: mro
+* (Installation) -j --instrument: low1 
+
+* (Spectrometer) -f --output_file: 
+* (Spectrometer) -o --switch_io_port: 0x3010
+* (Spectrometer) -e --switch_delay: 0.5
+* (Spectrometer) -l --input_channel: 1 
+* (Spectrometer) -v --voltage_range: 0 
+* (Spectrometer) -a --samples_per_accumulation: 2147483648 
+* (Spectrometer) -t --samples_per_transfer: 2097152
+* (Spectrometer) -r --acquisition_rate: 400 
+* (Spectrometer) -n --num_channels: 65536 
+* (Spectrometer) -q --num_taps: 5 
+* (Spectrometer) -w --window_function_id: 3 
+* (Spectrometer) -m --num_fft_threads: 4 
+* (Spectrometer) -b --num_fft_buffers: 400 
+* (Spectrometer) -c --stop_cycles:  
+* (Spectrometer) -s --stop_seconds: 
+* (Spectrometer) -u --stop_time: YYYY/MM/DDThh:mm:ss [UTC]
+* (Spectrometer) -p --show_plots: 0
+* (Spectrometer) -B --plot_bin: 1 
+* (Spectrometer) -F1 --sim_cw_freq1: 75
+* (Spectrometer) -A1 --sim_cw_amp1: 0.03
+* (Spectrometer) -F2 --sim_cw_freq2: 40
+* (Spectrometer) -A2 --sim_cw_amp2: 0.02
+* (Spectrometer) -AN --sim_noise_amp: 0.001
 
 The first term (e.g. 'Spectrometer') provides the .ini section under which the option is stored when entered into a configuration file.  The second term (e.g. '-p') is a shorthand command line flag for setting a parameter value.  The third term (e.g. 'show_plots') provides the paramater name in the .ini file.  It can also be used on the command line as '--show_plots [value]'.  Command line flags override any values provided in a .ini file.
 
 Some key parameters are:
 
--f: Specify an output file.  Overwrites any existing file at the specified path.  If no output file is specified on the command line or in a .ini file, FASTSPEC automatically determines output file paths from the datadir, site, and instrument parameters along with the time in UTC when spectra from each switch cycle is written.
+* -f: Specify an output file.  Overwrites any existing file at the specified path.  If no output file is specified on the command line or in a .ini file, FASTSPEC automatically determines output file paths from the datadir, site, and instrument parameters along with the time in UTC when spectra from each switch cycle is written.
           
--h: View this help message.
+* -h: View this help message.
 
--i: Specify the .ini configuration file.  If not specified, the default configuration file is tried (usually ./fastspec.ini)
+* -i: Specify the .ini configuration file.  If not specified, the default configuration file is tried (usually ./fastspec.ini)
 
 PROCESS CONTROL
 
 FASTSPEC can also be called to control the behavior of an already running instance.  Four commands are supported:
 
-hide: Send HIDE PLOTS signal to an already running FASTSPEC instance.
-kill: Send 'kill -9' signal to an already running FASTSPEC instance. 
-show: Send SHOW PLOTS signal to an already running FASTSPEC instance.
-stop: Send STOP signal to an already running FASTSPEC instance.
+* hide: Send HIDE PLOTS signal to an already running FASTSPEC instance.
+* kill: Send 'kill -9' signal to an already running FASTSPEC instance. 
+* show: Send SHOW PLOTS signal to an already running FASTSPEC instance.
+* stop: Send STOP signal to an already running FASTSPEC instance.
 
 PLOTTING
 
