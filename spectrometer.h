@@ -43,9 +43,6 @@ class Spectrometer : public DigitizerReceiver, ChannelizerReceiver {
     double          m_dStartFreq;               // MHz
     double          m_dStopFreq;                // MHz
     bool            m_bLocalStop;
-    std::string     m_sOutput;
-    std::string     m_sInstrument;
-    bool            m_bDirectory;
     bool            m_bUseStopCycles;
     bool            m_bUseStopSeconds;
     bool            m_bUseStopTime;
@@ -70,7 +67,6 @@ class Spectrometer : public DigitizerReceiver, ChannelizerReceiver {
     void run();
     void sendStop();
 
-    void setOutput(const std::string&, const std::string&, bool);
     void setStopCycles(unsigned long);
     void setStopSeconds(double);
     void setStopTime(const std::string&);

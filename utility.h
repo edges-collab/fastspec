@@ -50,16 +50,16 @@ std::string construct_filepath_name(const std::string&,
                                     const std::string&, 
                                     const std::string&);
 
-bool write_switch_cycle( const std::string&, Accumulator&, Accumulator&, 
-                         Accumulator& );
+bool append_switch_cycle( const std::string&, Accumulator&, Accumulator&, 
+                          Accumulator& );
 
-bool append_to_acq( const char*, const ACCUM_TYPE*, unsigned int, unsigned int, 
-                    unsigned int, unsigned int, unsigned int, unsigned int,  
-                    unsigned int, double, double, double, unsigned int, 
-                    double, double, double, unsigned long);
+bool append_switch_pos( const char*, const ACCUM_TYPE*, unsigned int,  
+                        unsigned int, unsigned int, unsigned int, unsigned int, 
+                        unsigned int, unsigned int, double, double, double,  
+                        unsigned int, double, double, double, unsigned long);
 
-bool write_for_plot(const std::string&, Accumulator&, Accumulator&, 
-                         Accumulator&, unsigned int );
+bool write_plot_file( const std::string&, Accumulator&, Accumulator&, 
+                      Accumulator&, unsigned int );
 
 
 // ----------------------------------------------------------------------------

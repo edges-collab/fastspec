@@ -117,17 +117,23 @@ string construct_filepath_name(const string& sBase,
 // write_for_plot() -- Writes all three spectra from full switch cycle to 
 //                         a text file.  
 // ----------------------------------------------------------------------------
-bool write_for_plot( const string& sFilePath,
-                     Accumulator& acc0, 
-                     Accumulator& acc1, 
-                     Accumulator& acc2, 
-                     unsigned int uDecimate = 1)
+bool write_plot_file( const string& sFilePath,
+                      Accumulator& acc0, 
+                      Accumulator& acc1, 
+                      Accumulator& acc2, 
+                      unsigned int uBin )
 {
 
   FILE* file;
   ACCUM_TYPE* p0 = acc0.getSum();
   ACCUM_TYPE* p1 = acc1.getSum();
   ACCUM_TYPE* p2 = acc2.getSum();
+  ACCUM_TYPE d0;
+  ACCUM_TYPE d1;
+  ACCUM_TYPE d2;
+  double f;
+  unsigned int count = 0;  
+
   double fstart = acc0.getStartFreq();
   double fstop = acc0.getStopFreq();
   double flength = (double) acc0.getDataLength();
@@ -135,10 +141,8 @@ bool write_for_plot( const string& sFilePath,
   double accums = (double) acc0.getNumAccums();
   double ta = 0;
 
-  //printf("fstart: %g, fstop: %g, df: %g\n", fstart, fstop, df);
-
   if ((file = fopen (sFilePath.c_str(), "w")) == NULL) {
-    printf ("Error writing to .dat file.  Cannot write to: %s\n", sFilePath.c_str());
+    printf ("Error writing to plot file.  Cannot write to: %s\n", sFilePath.c_str());
     return false;
   }
 
@@ -148,13 +152,37 @@ bool write_for_plot( const string& sFilePath,
   // Col 3: 10*log10(p1)
   // Col 4: 10*log10(p2)
   // Col 5: ta = 400*(p0-p1)/(p2-p1) + 300
-  for (unsigned int i = 0; i<acc0.getDataLength(); i+=uDecimate) {
+  for (unsigned int i = 0; i<acc0.getDataLength(); i++) {
 
-    ta = 400.0*(p0[i]-p1[i])/(p2[i]-p1[i])+300.0;
+    // Bin together uBin values
+    if (count == 0) {
+      f = fstart+df*i;
+      d0 = p0[i];
+      d1 = p1[i];
+      d2 = p2[i];
+    } else if (count < uBin) {
+      d0 += p0[i];
+      d1 += p1[i];
+      d2 += p2[i];
+      f += fstart+df*i;
+    }
 
-    fprintf(file, "%10.5f %12g %12g %12g %12g\n", 
-      fstart+df*i, 10.0*log10(p0[i]/accums),
-      10.0*log10(p1[i]/accums), 10.0*log10(p2[i]/accums), ta);
+    count++;
+
+    // Store the binned values
+    if (count == uBin) {
+
+      count = 0;
+      d0 = d0/uBin;
+      d1 = d1/uBin;
+      d2 = d2/uBin;
+      f = f/uBin;
+  
+      ta = 400.0*(d0-d1)/(d2-d1)+300.0;
+
+      fprintf(file, "%12g %12g %12g %12g %12g\n", 
+        f, 10.0*log10(d0/accums), 10.0*log10(d1/accums), 10.0*log10(d2/accums), ta);
+    }
   }
 
   fclose(file);
@@ -164,13 +192,13 @@ bool write_for_plot( const string& sFilePath,
 
 
 // ----------------------------------------------------------------------------
-// write_switch_cycle() -- Writes all three spectra from full switch cycle to 
+// append_switch_cycle() -- Writes all three spectra from full switch cycle to 
 //                         ACQ file.  
 // ----------------------------------------------------------------------------
-bool write_switch_cycle( const string& sFilePath,
-                         Accumulator& acc0, 
-                         Accumulator& acc1, 
-                         Accumulator& acc2 )
+bool append_switch_cycle( const string& sFilePath,
+                          Accumulator& acc0, 
+                          Accumulator& acc1, 
+                          Accumulator& acc2 )
 {
   Accumulator* pAccum = NULL;
   TimeKeeper startTime = acc0.getStartTime();
@@ -210,7 +238,7 @@ bool write_switch_cycle( const string& sFilePath,
           * (pAccum->getStopFreq() - pAccum->getStartFreq()) 
           / (double) pAccum->getDataLength();  // kHz
 
-    bResult = bResult && append_to_acq(sFilePath.c_str(), 
+    bResult = bResult && append_switch_pos(sFilePath.c_str(), 
                 pAccum->getSum(), pAccum->getDataLength(), i, 
                 startTime.year(), startTime.doy(), 
                 startTime.hh(), startTime.mm(), startTime.ss(),
@@ -230,7 +258,7 @@ bool write_switch_cycle( const string& sFilePath,
 
 
 // ----------------------------------------------------------------------------
-// append_to_acq() -- Append spectrum to ACQ file
+// append_switch_pos() -- Append spectrum to ACQ file
 //
 // We aim to write .acq files that are backward compatible with the old pxspec
 // output.  That leads to a couple of non-intuitive outputs as noted below...
@@ -249,19 +277,20 @@ bool write_switch_cycle( const string& sFilePath,
 //           then converted to dB, then have an offset subtracted, then are
 //           multiplied by 10^5 before being converted to integer for encoding. 
 // ----------------------------------------------------------------------------
-bool append_to_acq(const char* pchFilename, const ACCUM_TYPE* pSpectrum, 
-                                unsigned int uLength, 
-                                unsigned int uSwitch, 
-                                unsigned int year, unsigned int doy, 
-                                unsigned int hh, unsigned int mm, 
-                                unsigned int ss,
-                                double dStartFreq, double dStopFreq, 
-                                double dEffectiveChannelSize,
-                                unsigned int uNumAccums, 
-                                double dADCmin, double dADCmax, 
-                                double dTemp, unsigned long uDrops ) 
+bool append_switch_pos( const char* pchFilename, 
+                        const ACCUM_TYPE* pSpectrum, 
+                        unsigned int uLength, 
+                        unsigned int uSwitch, 
+                        unsigned int year, unsigned int doy, 
+                        unsigned int hh, unsigned int mm, 
+                        unsigned int ss,
+                        double dStartFreq, double dStopFreq, 
+                        double dEffectiveChannelSize,
+                        unsigned int uNumAccums, 
+                        double dADCmin, double dADCmax, 
+                        double dTemp, unsigned long uDrops ) 
 {
-  FILE *file;
+  FILE *file = NULL;
   unsigned int i, j;
   int k;
   char txt[256];
@@ -283,14 +312,15 @@ bool append_to_acq(const char* pchFilename, const ACCUM_TYPE* pSpectrum,
   b64[62] = '+';
   b64[63] = '/';
 
-  // Open the file for appending.  If it doesn't exist, yet, open
-  // it for writing.
-  if ((file = fopen (pchFilename, "a")) == NULL) {
+  // Open the file for appending
+  if (!is_file(pchFilename)) {
+    printf ("Error appending to ACQ file.  File not found: %s\n", pchFilename);
+    return false;
+  }
 
-    if ((file = fopen (pchFilename, "w")) == NULL) {
-      printf ("Error writing to ACQ file.  Cannot write to: %s\n", pchFilename);
-      return false;
-    }
+  if ((file = fopen (pchFilename, "a")) == NULL) {
+    printf ("Error appending to ACQ file.  Cannot write to: %s\n", pchFilename);
+    return false;
   }
 
   // Write the ancillary data to the file
@@ -300,13 +330,12 @@ bool append_to_acq(const char* pchFilename, const ACCUM_TYPE* pSpectrum,
             uSwitch, uDrops / uLength / 2, dADCmax, dADCmin, dTemp, uNumAccums, uLength);
 
   // Write the spectrum preamble to the file
-  sprintf (txt, "%4d:%03d:%02d:%02d:%02d %1d %8.3f %8.6f %8.3f %4.1f spectrum ",
+  fprintf (file, "%4d:%03d:%02d:%02d:%02d %1d %8.3f %8.6f %8.3f %4.1f spectrum ",
             year, doy, hh, mm, ss, uSwitch, dStartFreq, dStepFreq, dStopFreq, dADCmax);
-  fprintf (file, "%s", txt);
 
-// nblk = [[2?]] * uNumAccums  (I'm not sure about if three is a factor of 2 difference or not)
-// From pxspec: output_spec = 10.0 * log10( data[i] / (nblk*nspec*2.0) ) - 38.3;
-double dOut = 0;
+  // nblk = [[2?]] * uNumAccums  (I'm not sure about if three is a factor of 2 difference or not)
+  // From pxspec: output_spec = 10.0 * log10( data[i] / (nblk*nspec*2.0) ) - 38.3;
+  double dOut = 0;
 
   // Encode and write the spectrum to the file
   for (i=0; i<uLength; i++) {
@@ -342,5 +371,5 @@ double dOut = 0;
 
   return true;
 
-} // append_to_acq
+} // write_to_acq
 

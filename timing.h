@@ -245,6 +245,7 @@ class TimeKeeper {
       default:
         sprintf(txt, "%04d_%03d_%02d_%02d_%02d", m_iYear, m_iDayOfYear, m_iHour, 
                 m_iMinutes, m_iSeconds);
+        break;
       }
       
       return std::string(txt);

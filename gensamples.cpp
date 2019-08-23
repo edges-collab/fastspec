@@ -72,12 +72,14 @@ int main(int argc, char* argv[])
   unsigned long long i;
   unsigned long uRandom;
   unsigned short* pPointer;
-  unsigned short cw1[4];
-  unsigned short cw2[4];
+  double cw1[4];
+  double cw2[4];
   unsigned short noise[4];
 
   double dCW1 = 2.0*M_PI*dFreqCW1/dSamplesPerSecond;
   double dCW2 = 2.0*M_PI*dFreqCW2/dSamplesPerSecond;
+
+  //noise[0]=0; noise[1]=0; noise[2]=0; noise[3]=0;
 
   // Loop in increments of four to use an efficient random number generator
   for (i=0; i<uNumSamples; i+=4) {
@@ -88,32 +90,33 @@ int main(int argc, char* argv[])
     }
 
     // Calculate four samples of a continuous wave
-    cw1[0] = 32768.0 + 32768.0 * dAmpCW1 * sin(dCW1*i);
-    cw1[1] = 32768.0 + 32768.0 * dAmpCW1 * sin(dCW1*(i+1));
-    cw1[2] = 32768.0 + 32768.0 * dAmpCW1 * sin(dCW1*(i+2));
-    cw1[3] = 32768.0 + 32768.0 * dAmpCW1 * sin(dCW1*(i+3));
+    cw1[0] = dAmpCW1 * sin(dCW1*i);
+    cw1[1] = dAmpCW1 * sin(dCW1*(i+1));
+    cw1[2] = dAmpCW1 * sin(dCW1*(i+2));
+    cw1[3] = dAmpCW1 * sin(dCW1*(i+3));
 
-    cw2[0] = 32768.0 + 32768.0 * dAmpCW2 * sin(dCW2*i);
-    cw2[1] = 32768.0 + 32768.0 * dAmpCW2 * sin(dCW2*(i+1));
-    cw2[2] = 32768.0 + 32768.0 * dAmpCW2 * sin(dCW2*(i+2));
-    cw2[3] = 32768.0 + 32768.0 * dAmpCW2 * sin(dCW2*(i+3));    
+    cw2[0] = dAmpCW2 * sin(dCW2*i);
+    cw2[1] = dAmpCW2 * sin(dCW2*(i+1));
+    cw2[2] = dAmpCW2 * sin(dCW2*(i+2));
+    cw2[3] = dAmpCW2 * sin(dCW2*(i+3));    
 
     // Calculate four samples of gaussian noise
+    
     uRandom = xorshf96(); 
     pPointer = (unsigned short*) &uRandom;
-    noise[0] = (pPointer[0] & 0x7FFF) + 16384;
-    noise[1] = (pPointer[1] & 0x7FFF) + 16384;
-    noise[2] = (pPointer[2] & 0x7FFF) + 16384;
-    noise[3] = (pPointer[3] & 0x7FFF) + 16384;
-
+    noise[0] = 2.0 * dAmpNoise * (pPointer[0] & 0x7FFF);
+    noise[1] = 2.0 * dAmpNoise * (pPointer[1] & 0x7FFF);
+    noise[2] = 2.0 * dAmpNoise * (pPointer[2] & 0x7FFF);
+    noise[3] = 2.0 * dAmpNoise * (pPointer[3] & 0x7FFF);
+    
     // Add the three contributions together
-    cw1[0] += cw2[0] + noise[0];
-    cw1[1] += cw2[1] + noise[1];
-    cw1[2] += cw2[2] + noise[2];
-    cw1[3] += cw2[3] + noise[3];
+    noise[0] += (1.0 - dAmpNoise) * 32768.5 + 32768.0 * (cw2[0] + cw1[0]);
+    noise[1] += (1.0 - dAmpNoise) * 32768.5 + 32768.0 * (cw2[1] + cw1[1]);
+    noise[2] += (1.0 - dAmpNoise) * 32768.5 + 32768.0 * (cw2[2] + cw1[2]);
+    noise[3] += (1.0 - dAmpNoise) * 32768.5 + 32768.0 * (cw2[3] + cw1[3]);
 
     // Write samples
-    fwrite(cw1, sizeof(unsigned int), 4, pFile);
+    fwrite(noise, sizeof(unsigned short), 4, pFile);
   }
 
   // Close the output file

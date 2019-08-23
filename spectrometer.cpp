@@ -42,7 +42,7 @@ Spectrometer::Spectrometer(unsigned long uNumChannels,
   m_dAccumulationTime = (double) uNumSamplesPerAccumulation / m_dBandwidth / 2.0; // seconds
   m_dStartFreq = 0.0;
   m_dStopFreq = m_dBandwidth;
-  m_dChannelFactor = 4; // because of Blackmann Harris (should really be closer to 3)
+  m_dChannelFactor = 2; // because of Blackmann Harris 
 
   // Assign the Spectrometer instance's process function to the Digitizer
   // callback on data transfer.
@@ -104,39 +104,6 @@ Spectrometer::~Spectrometer()
 
 } // destructor
 
-
-
-// ----------------------------------------------------------------------------
-// setOutput
-// ----------------------------------------------------------------------------
-void Spectrometer::setOutput(const string& sOutput, const string& sInstrument, bool bDirectory)
-{
-  printf("Spectrometer: Will write output to %s\n", sOutput.c_str());
-
-  m_sOutput = sOutput;
-  m_sInstrument = sInstrument;
-  m_bDirectory = bDirectory;
-}
-
-
-
-// ----------------------------------------------------------------------------
-// getFileName
-// ----------------------------------------------------------------------------
-string Spectrometer::getFileName()
-{
-
-  string sSuffix = ".acq";
-
-  if (m_bDirectory)
-  {
-    TimeKeeper startTime = m_accumAntenna.getStartTime();
-    return construct_filepath_name(m_sOutput, startTime.getFileString(2), m_sInstrument, sSuffix);
-
-  } else {
-    return m_sOutput + sSuffix;
-  }
-}
 
 
 // ----------------------------------------------------------------------------
@@ -234,16 +201,8 @@ void Spectrometer::run()
     
     // Write to ACQ
     writeTimer.tic();;
-    printf("\nSpectrometer: Writing to file: %s\n", getFileName().c_str());
-    write_switch_cycle(getFileName(), m_accumAntenna, m_accumAmbientLoad, m_accumHotLoad);      
-    //writeTimer.toc();
-
-    // Write a file for plotting
-    if (m_pController->plot()) {
-      printf("Spectrometer: Writing to plot file: /tmp/fastspec.dat\n");
-      write_for_plot(m_pController->plotPath(), m_accumAntenna, m_accumAmbientLoad, m_accumHotLoad, 4);
-      m_pController->updatePlotter();
-    }
+    printf("\nSpectrometer: Writing to file...\n");
+    m_pController->onSpectrometerData(m_accumAntenna, m_accumAmbientLoad, m_accumHotLoad);
     writeTimer.toc();
 
     // Calculate overall duty cycle
@@ -386,7 +345,7 @@ unsigned long Spectrometer::onDigitizerData( unsigned short* pBuffer,
 {
   unsigned int uIndex = 0;
   unsigned int uAdded = 0;
-  unsigned int uDropped = 0;
+  //unsigned int uDropped = 0;
 
   // Loop over the transferred data and enter it into the channelizer buffer
   while ( ((uIndex + m_uNumFFT) <= uBufferLength) 
@@ -399,18 +358,18 @@ unsigned long Spectrometer::onDigitizerData( unsigned short* pBuffer,
       uTransferredSoFar += m_uNumFFT;
       uAdded++;
 
-    } else {
+    } //else {
 
       // No buffers were available so we'll drop the chunk and move on
-      uDropped++;
-    }
+      //uDropped++;
+    //}
 
     // Increment the index to the next chunk of transferred data
     uIndex += m_uNumFFT;
   }
 
   // Keep a permanent record of how many samples were dropped
-  m_pCurrentAccum->addDrops(uDropped * m_uNumFFT);
+  m_pCurrentAccum->addDrops(uBufferLength - uAdded * m_uNumFFT);
 
   //printf("onTransfer: added blocks here: %u, dropped blocks here: %u, total samples: %lu\n", uAdded, uDropped, uTransferredSoFar);
 

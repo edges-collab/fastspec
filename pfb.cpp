@@ -117,23 +117,29 @@ bool PFB::setWindowFunction(unsigned int uType)
   // Apply window function (if any)
   switch (uType) {
 
-    // Blackman Harris
-    case 1:
-      printf ("PFB: Using Blackman Harris window function\n");
-      get_blackman_harris(m_pWindow, m_uNumSamples);
-      break;
-
-    // None (all ones)
-    default: 
-      printf ("PFB: No window function -- sinc function only\n");
+    case 1: 
+      printf ("PFB: No window function (no sinc)\n");
       for (unsigned int i=0; i<m_uNumSamples; i++) {
         m_pWindow[i] = 1;
       }
       break;
-  }
 
-  // Always apply the sinc function for the PFB
-  get_sinc(m_pWindow, m_uNumSamples, m_uNumChannels, true);
+    case 2:
+      printf ("PFB: Using sinc with Blackman Harris window function\n");
+      get_blackman_harris(m_pWindow, m_uNumSamples);
+      get_sinc(m_pWindow, m_uNumSamples, m_uNumChannels, true);
+      break;
+
+    case 3:
+      printf ("PFB: Using Blackman Harris (only, no sinc) window function\n");
+      get_blackman_harris(m_pWindow, m_uNumSamples);
+      break;
+
+    default: 
+      printf ("PFB: Using sinc only, no additional window function\n");
+      get_sinc(m_pWindow, m_uNumSamples, m_uNumChannels, false);
+      break;
+  }
     
   return true;
 }

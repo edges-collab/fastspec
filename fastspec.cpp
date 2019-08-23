@@ -1,5 +1,5 @@
 
-#define DEFAULT_INI_FILE "./edges.ini" 
+#define DEFAULT_INI_FILE "./fastspec.ini" 
 
 #ifdef SIMULATE
   #include "pxsim.h"
@@ -58,7 +58,7 @@ void print_help()
   printf("a shorthand command line flag for setting a parameter value.  The third\n");
   printf("term (e.g. 'show_plots') provides the paramater name in the .ini file.\n");
   printf("It can also be used on the command line as '--show_plots [value]'.\n");
-  printf("Command line flags override any value provided in a .ini file.\n\n");
+  printf("Command line flags override any values provided in a .ini file.\n\n");
 
   printf("Some key parameters are:\n\n");
 
@@ -73,11 +73,21 @@ void print_help()
   printf("               " DEFAULT_INI_FILE "\n\n");
 
   printf("FASTSPEC can also be called to control the behavior of an already running\n");
-  printf("instance.  Three commands are supported:\n\n");
+  printf("instance.  Four commands are supported:\n\n");
 
-  printf("hide      Send HIDE PLOTS signal to a currently running FASTSPEC instance.\n");
-  printf("show      Send SHOW PLOTS signal to a currently running FASTSPEC instance.\n");
-  printf("stop      Send STOP signal to a currently running FASTSPEC instance.\n\n");
+  printf("hide      Send HIDE PLOTS signal to an already running FASTSPEC instance.\n");
+  printf("kill      Send 'kill -9' signal to an already running FASTSPEC instance.\n");  
+  printf("show      Send SHOW PLOTS signal to an already running FASTSPEC instance.\n");
+  printf("stop      Send STOP signal to an already running FASTSPEC instance.\n\n");
+
+  printf("FASTSPEC uses gnuplot for plotting ('-p', '--show_plots').  Gnuplot can be\n");
+  printf("installed using the system package manager, e.g. sudo apt-get install gnuplot.\n");
+  printf("In addition to the built-in gnuplot commands, such as '+' and '-' to scale\n");
+  printf("the plot, right clicking corners of a box to zoom, exporting to image files,\n");
+  printf("etc., the FASTSPEC plot can be toggled between a plot showing the raw switch\n");
+  printf("spectra and a plot showing the'corrected' (uncalibrated) antenna temperature\n"); 
+  printf("by pressing 'x' in the plot window.\n\n");
+
 }
 
 
@@ -163,6 +173,7 @@ int main(int argc, char* argv[])
     iCtrlMode = ctrl.getOptionBool("[ARGS]", "stop", "stop", false) ? CTRL_MODE_STOP : iCtrlMode;
     iCtrlMode = ctrl.getOptionBool("[ARGS]", "show", "show", false) ? CTRL_MODE_SHOW : iCtrlMode;
     iCtrlMode = ctrl.getOptionBool("[ARGS]", "hide", "hide", false) ? CTRL_MODE_HIDE : iCtrlMode;
+    iCtrlMode = ctrl.getOptionBool("[ARGS]", "kill", "kill", false) ? CTRL_MODE_KILL : iCtrlMode;
 
     if (!ctrl.run(iCtrlMode)) {
       return 0;
@@ -187,20 +198,28 @@ int main(int argc, char* argv[])
     long uSwitchIOPort        = ctrl.getOptionInt("Spectrometer", "switch_io_port", "-o", 0x3010);
     double dSwitchDelay       = ctrl.getOptionReal("Spectrometer", "switch_delay", "-e", 0.5);
     long uInputChannel        = ctrl.getOptionInt("Spectrometer", "input_channel", "-l", 2);
-    long uNumChannels         = ctrl.getOptionInt("Spectrometer", "num_channels", "-n", 65536);
+    long uVoltageRange        = ctrl.getOptionInt("Spectrometer", "voltage_range", "-v", 0);
     long uSamplesPerAccum     = ctrl.getOptionInt("Spectrometer", "samples_per_accumulation", "-a", 1024L*2L*1024L*1024L);
     long uSamplesPerTransfer  = ctrl.getOptionInt("Spectrometer", "samples_per_transfer", "-t", 2*1024*1024);
-    long uVoltageRange        = ctrl.getOptionInt("Spectrometer", "voltage_range", "-v", 0);
     double dAcquisitionRate   = ctrl.getOptionInt("Spectrometer", "acquisition_rate", "-r", 400);
-    long uNumThreads          = ctrl.getOptionInt("Spectrometer", "num_fft_threads", "-m", 4);
-    long uNumBuffers          = ctrl.getOptionInt("Spectrometer", "num_fft_buffers", "-b", 400);
+    long uNumChannels         = ctrl.getOptionInt("Spectrometer", "num_channels", "-n", 65536);
     long uNumTaps             = ctrl.getOptionInt("Spectrometer", "num_taps", "-q", 5);
     long uWindowFunctionId    = ctrl.getOptionInt("Spectrometer", "window_function_id", "-w", 1);
-    bool bStoreConfig         = ctrl.getOptionBool("Spectrometer", "store_config", "-k", false);
+    long uNumThreads          = ctrl.getOptionInt("Spectrometer", "num_fft_threads", "-m", 4);
+    long uNumBuffers          = ctrl.getOptionInt("Spectrometer", "num_fft_buffers", "-b", 400);
     long uStopCycles          = ctrl.getOptionInt("Spectrometer", "stop_cycles", "-c", 0); 
     double dStopSeconds       = ctrl.getOptionReal("Spectrometer", "stop_seconds", "-s", 0);
     string sStopTime          = ctrl.getOptionStr("Spectrometer", "stop_time", "-u", "");
     bool bPlot                = ctrl.getOptionBool("Spectrometer", "show_plots", "-p", false);    
+    long uPlotBin             = ctrl.getOptionInt("Spectrometer", "plot_bin", "-B", 1);  
+
+    #ifdef SIMULATE
+      double dCWFreq1         = ctrl.getOptionReal("Spectrometer", "sim_cw_freq1", "-F1", 75);
+      double dCWAmp1          = ctrl.getOptionReal("Spectrometer", "sim_cw_amp1", "-A1", 0.3);
+      double dCWFreq2         = ctrl.getOptionReal("Spectrometer", "sim_cw_freq2", "-F2", 40);
+      double dCWAmp2          = ctrl.getOptionReal("Spectrometer", "sim_cw_amp2", "-A2", 0.2);  
+      double dNoiseAmp        = ctrl.getOptionReal("Spectrometer", "sim_noise_amp", "-AN", 0.1);
+    #endif
 
     // Handle help flag if set
     if (ctrl.getOptionBool("[ARGS]", "help", "-h", false)) {
@@ -209,19 +228,14 @@ int main(int argc, char* argv[])
     }
 
     // Set controls
-    ctrl.setPlot(bPlot);
+    ctrl.setPlot(bPlot, (unsigned int) uPlotBin);    
+    ctrl.setOutput(sDataDir, sSite, sInstrument, sOutput);
 
     // Calculate a few derived configuration parameters
     double dBandwidth = dAcquisitionRate / 2.0;
     unsigned int uNumFFT = uNumChannels * 2;
     printf("Bandwidth: %6.2f\n", dBandwidth);        
-    printf("Samples per FFT: %d\n", uNumFFT);    
-    printf("\n");
-
-    bool bDirectory = sOutput.empty();
-    if (bDirectory) { 
-      sOutput = sDataDir + "/" + sSite + "/" + sInstrument; 
-    }
+    printf("Samples per FFT: %d\n", uNumFFT);  
 
     // -----------------------------------------------------------------------
     // Check the configuration
@@ -237,46 +251,12 @@ int main(int argc, char* argv[])
              "multiple of the number of FFT samples.\n\n");
     }
 
-
-    // -----------------------------------------------------------------------
-    // Store a copy of the ini file with the data we're about to write
-    // -----------------------------------------------------------------------
-    if (bStoreConfig) {
-
-      ifstream src(sConfigFile, ios::binary);
-      string sSuffix = ".ini";
-      string sStoreFile;     
-
-      if (bDirectory) {
-
-        // Use the same naming scheme as the spectrometer output, but with more date detail
-        TimeKeeper tk;
-        tk.setNow();
-        string sDateString = tk.getFileString(5);
-        sStoreFile = construct_filepath_name(sOutput, sDateString, sInstrument, sSuffix);
-
-      } else {
-        
-        // Use the name provided
-        sStoreFile = sOutput + sSuffix;
-      }
-      
-      printf("Storing copy of configuration in: %s\n", sStoreFile.c_str());
-      if (make_path(get_path(sStoreFile), 0755)) {
-        ofstream dst(sStoreFile, ios::binary);
-        dst << src.rdbuf();     
-        printf("Done.\n");
-      } else {
-        printf("Failed.\n");
-      }
-    }
-
     // -----------------------------------------------------------------------
     // Initialize the receiver switch
     // -----------------------------------------------------------------------   
     SWITCH sw; 
     if (!sw.init(uSwitchIOPort)) {
-      printf("Failed to control parallel port.  Abort.\n");
+      printf("Failed to control receiver switch.  Abort.\n");
       return 1;
     }
     sw.set(0);
@@ -290,6 +270,10 @@ int main(int argc, char* argv[])
     dig.setVoltageRange(2, uVoltageRange);
     dig.setAcquisitionRate(dAcquisitionRate);
     dig.setTransferSamples(uSamplesPerTransfer); // should be a multiple of number of FFT samples
+
+    #ifdef SIMULATE
+      dig.setSignal(dCWFreq1, dCWAmp1, dCWFreq2, dCWAmp2, dNoiseAmp);
+    #endif
 
     // Connect to the digitizer board
     if (!dig.connect(1)) { 
@@ -319,8 +303,6 @@ int main(int argc, char* argv[])
                        (Channelizer*) &chan,
                        (Switch*) &sw, 
                        &ctrl );
-
-    spec.setOutput(sOutput, sInstrument, bDirectory);
 
     if (uStopCycles > 0) { spec.setStopCycles(uStopCycles); }
     if (dStopSeconds > 0) { spec.setStopSeconds(dStopSeconds); }

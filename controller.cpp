@@ -2,6 +2,7 @@
 #include <fstream>      // ifstream, ofstream
 #include <signal.h>     // sigaction
 #include <sys/types.h>  
+#include <sstream>
 #include <limits>       // numeric_limits<int>::max();
 #include "utility.h"    // font colors
 #include "controller.h"
@@ -20,6 +21,8 @@ Controller::Controller() {
   m_bStopSignal = false;
   m_bPlot = false;
   m_pSpawn = NULL;
+  m_uPlotBin = 1;
+  m_bDirectory = true;
 }
 
 
@@ -29,7 +32,7 @@ Controller::Controller() {
 Controller::~Controller() {
 
   // Stop any plotting
-  setPlot(false);
+  setPlot(false, m_uPlotBin);
 
   // Close out as needed for the execution modes
   switch (m_iMode) {
@@ -65,6 +68,16 @@ void Controller::deletePlot() {
 }
 
 
+// ----------------------------------------------------------------------------
+// getConfigStr - Returns a string listing all of the configuration options
+//                that have been queried using getOption*() and the value
+//                that was returned in the query.  Formatted as:
+//
+//                "; <option long name>: <value>\n"      
+// ----------------------------------------------------------------------------
+std::string Controller::getConfigStr() const {
+  return m_strConfig;
+}
 
 
 // ----------------------------------------------------------------------------
@@ -105,6 +118,10 @@ long Controller::getOptionBool( const std::string& strSection,
 
   // Print the option parameter name and value
   printf("Using: (%s) %s %s: %d\n", strSection.c_str(), strS.c_str(), strL.c_str(), val);
+
+  // Add to the config string
+  m_strConfig += ";" + strL + ": " + std::to_string(val) + "\n";
+
   return val;
 }
 
@@ -147,9 +164,15 @@ long Controller::getOptionInt( const std::string& strSection,
   // Print the option parameter name and value
   if (val > std::numeric_limits<unsigned int>::max()) {
     printf("Using: (%s) %s %s: %ld\n", strSection.c_str(), strS.c_str(), strL.c_str(), val);
+    m_strConfig += ";" + strL + ": " + std::to_string(val) + "\n";
+
   } else {
     printf("Using: (%s) %s %s: %ld (0x%x)\n", strSection.c_str(), strS.c_str(), strL.c_str(), val, (unsigned int) val);
+    std::stringstream ss;
+    ss << std::hex << (unsigned int) val;
+    m_strConfig += ";" + strL + ": " + std::to_string(val) + " (0x" + ss.str() + ")\n";
   }
+
   return val;
 }
 
@@ -189,6 +212,10 @@ double Controller::getOptionReal( const std::string& strSection,
 
   // Print the option parameter name and value
   printf("Using: (%s) %s %s: %g\n", strSection.c_str(), strS.c_str(), strL.c_str(), val);
+
+  // Add to the config string
+  m_strConfig += ";" + strL + ": " + std::to_string(val) + "\n";
+
   return val;
 }
 
@@ -227,6 +254,10 @@ std::string Controller::getOptionStr( const std::string& strSection,
 
   // Print the option parameter name and value
   printf("Using: (%s) %s %s: %s\n", strSection.c_str(), strS.c_str(), strL.c_str(), val.c_str());
+
+  // Add to the config string
+  m_strConfig += ";" + strL + ": " + val + "\n";
+
   return val;
 }
 
@@ -291,15 +322,66 @@ void Controller::onSignal(int iSignalNumber) {
       printf(BLU "----------------------------------------------------------------------\n" RESET);
       printf(BLU "*** SHOW PLOT signal received ***\n" RESET);
       printf(BLU "----------------------------------------------------------------------\n" RESET);         
-      setPlot(true);
+      setPlot(true, m_uPlotBin);
       break;
 
     case SIGUSR2:
       printf(BLU "----------------------------------------------------------------------\n" RESET);
       printf(BLU "*** HIDE PLOT signal received ***\n" RESET);
       printf(BLU "----------------------------------------------------------------------\n" RESET);         
-      setPlot(false);
+      setPlot(false, m_uPlotBin);
       break;
+  }
+}
+
+void Controller::onSpectrometerData( Accumulator& acc0, Accumulator& acc1, 
+                                     Accumulator& acc2 ) {
+
+  bool bStartFile = false;
+
+  // Create a new file if using directory method and it is first write 
+  // or a new day
+  if (m_bDirectory && (m_sOutput.empty() || (m_tkPrevStartTime.doy() != acc0.getStartTime().doy()) )) {
+
+    // Get the new path
+    m_sOutput = construct_filepath_name( std::string(m_sDataDir + "/" + m_sSite + "/" + m_sInstrument),
+                                          acc0.getStartTime().getFileString(5), m_sInstrument, ".acq" );
+    bStartFile = true;
+
+  // Overwrite anything in the user specified output file if this is 
+  // our first write and we're not using directory method
+  } else if (!m_bDirectory && (m_tkPrevStartTime == TimeKeeper())) {
+    bStartFile = true;
+  }
+
+  // Note the start time of the current data
+  m_tkPrevStartTime = acc0.getStartTime();
+
+
+  // Write the .acq entry
+  printf("Controller: Writing to file: %s\n", m_sOutput.c_str());
+
+  // If needed, start a new file and write the header
+  if (bStartFile) {
+    std::ofstream fs;
+    fs.open(m_sOutput);
+    if (fs.is_open()) {
+      fs << m_strConfig;
+      fs.close();
+    }
+  }
+
+  // Write the data
+  append_switch_cycle(m_sOutput, acc0, acc1, acc2);
+
+  // Handle plotting if enabled
+  if (m_bPlot) {
+
+    // Write the temporary file for plotting
+    write_plot_file(PLOT_FILE, acc0, acc1, acc2, m_uPlotBin);
+
+    // Tell the plotter to refresh
+    updatePlotter();
   }
 }
 
@@ -309,14 +391,6 @@ void Controller::onSignal(int iSignalNumber) {
 // ----------------------------------------------------------------------------
 bool Controller::plot() const { 
   return m_bPlot; 
-}
-
-
-// ----------------------------------------------------------------------------
-// plotPath - return the path to the temporary plot data file
-// ----------------------------------------------------------------------------
-std::string Controller::plotPath() { 
-  return std::string(PLOT_FILE); 
 }
 
 
@@ -397,12 +471,25 @@ bool Controller::run(int iMode) {
       }
       break;
 
-    // Stop execution of an existing instance if a valid pid exists
+    // Stop execution (gracefully) of an existing instance if a valid pid exists
     case CTRL_MODE_STOP:
 
       if (bExistingProc) {
         printf("Controller: Sending stop signal to previous PID (%d)\n", oldpid);
         sendStopSignal(oldpid);
+        return false;
+      }
+      
+      printf("Controller: No valid existing instance found\n");
+      return false;
+      break;
+
+    // Stop execution of an existing instance if a valid pid exists
+    case CTRL_MODE_KILL:
+
+      if (bExistingProc) {
+        printf("Controller: Sending kill -9 signal to previous PID (%d)\n", oldpid);
+        sendKillSignal(oldpid);
         return false;
       }
       
@@ -502,9 +589,37 @@ bool Controller::setINI(const std::string& str) {
 
 
 // ----------------------------------------------------------------------------
-// setPlot - Tell the controller that there should be plotting (or not)
+// setOutput
 // ----------------------------------------------------------------------------
-void Controller::setPlot(bool bPlot) { 
+void Controller::setOutput( const std::string& sDataDir, 
+                            const std::string& sSite, 
+                            const std::string& sInstrument, 
+                            const std::string& sOutput) {
+
+  m_sDataDir = sDataDir;
+  m_sSite = sSite;
+  m_sInstrument = sInstrument;
+  m_sOutput = sOutput;
+  m_bDirectory = sOutput.empty();
+
+  if (m_bDirectory) {
+    printf("Controller: Will write output to %s\n", std::string(sDataDir + "/" + sSite + "/" + sInstrument).c_str());
+  } else {
+    printf("Controller: Will write output to %s\n", sOutput.c_str());
+  }
+}
+
+
+
+// ----------------------------------------------------------------------------
+// setPlot - Tell the controller that there should be plotting (or not).
+//           uPlotbin channels are binned (averaged) together when saving the 
+//           temporary plot data.  uPlotbin is ignored when bPlot is false;
+//           
+// ----------------------------------------------------------------------------
+void Controller::setPlot(bool bPlot, unsigned int uPlotBin) { 
+
+  m_uPlotBin = uPlotBin;
 
   // Nothing to do if already in the desired state
   if (bPlot == m_bPlot) {
@@ -512,10 +627,10 @@ void Controller::setPlot(bool bPlot) {
   }
 
   m_bPlot = bPlot; 
+
   if (!m_bPlot) {
     // If stopping plotting, do some cleanup
     stopPlotter();
-    //deletePlot();
   }
 }
 
@@ -560,11 +675,12 @@ void Controller::updatePlotter() {
       // Send the commands to initialize the plotting
       m_pSpawn->stdin << "set macros" << std::endl;
       m_pSpawn->stdin << "set xlabel 'Frequency [MHz]'" << std::endl;
-      m_pSpawn->stdin << "raw = 'set ylabel \"Power [dB] (arb)\"; unset yrange; plot \"/tmp/fastspec.dat\" using 1:2 title \"p0 (antenna)\" with lines, \"/tmp/fastspec.dat\" using 1:3 title \"p1 (load)\" with lines, \"/tmp/fastspec.dat\" using 1:4 title \"p2 (load+cal)\" with lines'" << std::endl;
-      m_pSpawn->stdin << "ta = 'set ylabel \"Temperature [K]\"; set yrange [100:10000]; plot \"/tmp/fastspec.dat\" using 1:5 title \"T_{ant} (uncalib)\" with lines'" << std::endl;
+      m_pSpawn->stdin << "raw = 'set ylabel \"Power [dB] (arb)\"; unset yrange; plot \"" << PLOT_FILE << "\" using 1:2 title \"p0 (antenna)\" with lines, \"" << PLOT_FILE << "\" using 1:3 title \"p1 (load)\" with lines, \"" << PLOT_FILE << "\" using 1:4 title \"p2 (load+cal)\" with lines'" << std::endl;
+      m_pSpawn->stdin << "ta = 'set ylabel \"Temperature [K]\"; set yrange [100:10000]; plot \"" << PLOT_FILE << "\" using 1:5 title \"T_{ant} (uncalib)\" with lines'" << std::endl;
       m_pSpawn->stdin << "@raw" << std::endl;
       m_pSpawn->stdin << "type=0" << std::endl;
       m_pSpawn->stdin << "bind all 'x' 'type=!type; if (type) { @ta } else { @raw }'" << std::endl;
+      m_pSpawn->stdin << "set term qt title 'FASTSPEC Plot'" << std::endl;
     }
   }
 
@@ -578,7 +694,9 @@ void Controller::updatePlotter() {
 
 
 // ----------------------------------------------------------------------------
-// writeControlFile - (Over)write PID to file
+// writeControlFile - (Over)write PID and the process start time to file so
+//                  - so another instance of the executable can verify that 
+//                  - that one is/isn't already running.    
 // ----------------------------------------------------------------------------
 bool Controller::writeControlFile() {
 
