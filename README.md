@@ -7,17 +7,27 @@ FASTPEC is a spectrometer for the EDGES instrument.  It controls the receiver sw
 
 INSTALLATION
 
-Install FASTSPEC by entering the fastspec directory and using 'make' to compile the executable.  FASTSPEC can be compiled in several ways:
+Prior to building, ensure the following dependencies are installed on the system:
 
-make single - uses single floating point precision in the FFT and controls the receiver switch through a parallel port
+* fftw3f-dev (for single precision versions)
+
+* fft3-dev (for double-precision versions) 
+
+* sig_px14400 (not needed for simulator version)
+
+* wdt_dio (for Mezio version)
+
+Compile FASTSPEC by entering the fastspec directory and using 'make' to compile the executable.  FASTSPEC can be compiled in several ways:
+
+* make single - uses single floating point precision in the FFT and controls the receiver switch through a parallel port
               
-make double - uses double floating point precision in the FFT and controls the receiver switch through a parallel port
+* make double - uses double floating point precision in the FFT and controls the receiver switch through a parallel port
                
-make mezio - uses single point precision in the FFT and controls the receiver through a MezIO interface.
+* make mezio - uses single point precision in the FFT and controls the receiver through a MezIO interface.
 
-make simulate - generates a mock digitizer data stream and processes it identically to the "single" configuration above. A simulated receiver switch is used so no physical hardware is controlled.
+* make simulate - generates a mock digitizer data stream and processes it identically to the "single" configuration above. A simulated receiver switch is used so no physical hardware is controlled.
           
-Use 'sudo make [target]' to install the resulting executable in /usr/local/bin. It will also ensure the s-bit is set so for the  versions that need access to the parallel port.
+Use 'sudo make [target]' when building to compile and install the resulting executable in /usr/local/bin. It will also ensure the s-bit is set for versions that need access to the parallel port.
 
 RUNNING
 
