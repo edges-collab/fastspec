@@ -62,7 +62,8 @@ class PFB : public Channelizer {
   public:
 
     // Constructor and destructor
-    PFB(unsigned int, unsigned int, unsigned int, unsigned int);
+    PFB( unsigned int, unsigned int, unsigned int, unsigned int, 
+         unsigned int );
     ~PFB();
 
     // Interface functions

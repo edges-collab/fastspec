@@ -18,7 +18,6 @@
   #endif
 #endif
 
-#include "ini.h"
 #include "pfb.h"
 #include "spectrometer.h"
 #include "switch.h"
@@ -27,6 +26,10 @@
 #include <fstream>      // ifstream, ofstream, ios
 
 
+// ----------------------------------------------------------------------------
+// The controller must be a global object so that the signal handling can
+// be routed through it.
+// ----------------------------------------------------------------------------
 Controller ctrl;
 
 void on_signal(int iSignalNumber) {
@@ -91,61 +94,6 @@ void print_help()
 }
 
 
-/*
-// ----------------------------------------------------------------------------
-// print_config - Print configuration to terminal
-// ----------------------------------------------------------------------------
-void print_config( const string& sConfigFile, const string& sSite, 
-                   const string& sInstrument, const string& sOutput,
-                   double dAcquisitionRate, double dBandwidth,
-                   unsigned int uInputChannel, unsigned int uVoltageRange,
-                   unsigned int uNumChannels, unsigned int uSamplesPerTransfer,
-                   unsigned long uSamplesPerAccum, unsigned int uSwitchIOport,
-                   double dSwitchDelay, unsigned int uNumFFT, 
-                   unsigned int uNumThreads, unsigned int uNumBuffers, 
-                   unsigned int uNumTaps, unsigned int uWindowFunctionId,
-                   unsigned int uStopCycles, double dStopSeconds, 
-                   const string& sStopTime, bool bStoreConfig )
-{
-  printf("\n");
-  printf("| ------------------------------------------------------------------------\n");
-  printf("| FASTSPEC\n");
-  printf("| ------------------------------------------------------------------------\n");  
-  printf("| \n");
-  printf("| Configuration file: %s\n", sConfigFile.c_str());
-  printf("| \n");    
-  printf("| Installation - Site: %s\n", sSite.c_str());
-  printf("| Installation - Instrument: %s\n", sInstrument.c_str());
-  printf("| Installation - Output path: %s\n", sOutput.c_str());
-  printf("| \n");      
-  printf("| Spectrometer - Digitizer - Input channel: %d\n", uInputChannel);
-  printf("| Spectrometer - Digitizer - Voltage range mode: %d\n", uVoltageRange);
-  printf("| Spectrometer - Digitizer - Number of channels: %d\n", uNumChannels);
-  printf("| Spectrometer - Digitizer - Acquisition rate: %g\n", dAcquisitionRate);
-  printf("| Spectrometer - Digitizer - Samples per transfer: %d\n", uSamplesPerTransfer);
-  printf("| Spectrometer - Digitizer - Samples per accumulation: %lu\n", uSamplesPerAccum);
-  printf("| \n"); 
-  printf("| Spectrometer - Switch - Receiver switch IO port: 0x%x\n", uSwitchIOport); 
-  printf("| Spectrometer - Switch - Receiver switch delay (seconds): %g\n", dSwitchDelay); 
-  printf("| \n");   
-  printf("| Spectrometer - Channelizer - Number of FFT threads: %d\n", uNumThreads);
-  printf("| Spectrometer - Channelizer - Number of FFT buffers: %d\n", uNumBuffers);
-  printf("| Spectrometer - Channelizer - Number of polyphase filter bank taps: %d\n", uNumTaps);
-  printf("| Spectrometer - Channelizer - Window function ID: %d\n", uWindowFunctionId);  
-  printf("| Spectrometer - Channelizer - Stop after cycles: %d\n", uStopCycles);
-  printf("| Spectrometer - Channelizer - Stop after seconds: %g\n", dStopSeconds);
-  printf("| Spectrometer - Channelizer - Stop at UTC: %s\n", (sStopTime.empty() ? "---" : sStopTime.c_str()));
-  printf("| Spectrometer - Channelizer - Store copy of configuration file: %d\n", bStoreConfig);
-  printf("| \n");  
-  printf("| Bandwidth: %6.2f\n", dBandwidth);        
-  printf("| Samples per FFT: %d\n", uNumFFT);    
-  printf("| \n");              
-  printf("| ------------------------------------------------------------------------\n"); 
-  printf("\n");
-}
-
-*/
-
 
 // ----------------------------------------------------------------------------
 // Main
@@ -174,11 +122,13 @@ int main(int argc, char* argv[])
     iCtrlMode = ctrl.getOptionBool("[ARGS]", "show", "show", false) ? CTRL_MODE_SHOW : iCtrlMode;
     iCtrlMode = ctrl.getOptionBool("[ARGS]", "hide", "hide", false) ? CTRL_MODE_HIDE : iCtrlMode;
     iCtrlMode = ctrl.getOptionBool("[ARGS]", "kill", "kill", false) ? CTRL_MODE_KILL : iCtrlMode;
+    iCtrlMode = ctrl.getOptionBool("[ARGS]", "help", "-h", false) ? CTRL_MODE_HELP : iCtrlMode;
 
+    // Set the controller's mode based on the above options.  If the
+    // controller returns false, then the execution should terminate.
     if (!ctrl.run(iCtrlMode)) {
       return 0;
     }
-
 
     // -----------------------------------------------------------------------
     // Parse the configuration options from command line and INI file
@@ -186,7 +136,7 @@ int main(int argc, char* argv[])
 
     string sConfigFile = ctrl.getOptionStr("[ARGS]", "inifile", "-i", string(DEFAULT_INI_FILE));
 
-    if (!ctrl.setINI(sConfigFile)) {
+    if (!ctrl.setINI(sConfigFile) && (iCtrlMode != CTRL_MODE_HELP)) {
       printf("Failed to parse .ini config file -- Using only command line\n");
       printf("arguments and default values.\n");
     }
@@ -221,13 +171,15 @@ int main(int argc, char* argv[])
       double dNoiseAmp        = ctrl.getOptionReal("Spectrometer", "sim_noise_amp", "-AN", 0.1);
     #endif
 
-    // Handle help flag if set
-    if (ctrl.getOptionBool("[ARGS]", "help", "-h", false)) {
+    // Handle help flag if set (do this after parsing configuration so that the
+    // configuration options are visible as part of the help message).
+    if (iCtrlMode == CTRL_MODE_HELP) {
       print_help();
       return 0;
     }
 
-    // Set controls
+    // Set some controls (the controller parses the configuration, but doesn't
+    // used any of the info until explictly told)
     ctrl.setPlot(bPlot, (unsigned int) uPlotBin);    
     ctrl.setOutput(sDataDir, sSite, sInstrument, sOutput);
 
@@ -241,14 +193,17 @@ int main(int argc, char* argv[])
     // Check the configuration
     // -----------------------------------------------------------------------  
     if (uSamplesPerTransfer % uNumFFT != 0) {
-      printf("Warning: The number of samples per transfer is not a multiple "
-             "of the number of FFT samples.  Will not be able to achieve "
-             "100%% duty cycle.\n\n");
+      printf("WARNING: The number of samples per transfer is not a multiple "
+             "of the number of FFT samples.  This wil likely lead to poor "
+             "sidelobe performance in the channelizer (due to discontinuous "
+             "time stream).  Also, will not be able to achieve highest "
+             "possible duty cycle.\n\n");
     }
 
     if (uSamplesPerAccum % uNumFFT != 0) {
-      printf("Warning: The number of samples per accumulation is not a "
-             "multiple of the number of FFT samples.\n\n");
+      printf("WARNING: The number of samples per accumulation is not a "
+             "multiple of the number of FFT samples.  Will not be able to "
+             "achieve highest possible duty cycle.\n\n");
     }
 
     // -----------------------------------------------------------------------
@@ -287,10 +242,8 @@ int main(int argc, char* argv[])
     PFB chan ( uNumThreads,
                uNumBuffers,
                uNumChannels, 
-               uNumTaps );
-
-    // Select the window function
-    chan.setWindowFunction(uWindowFunctionId);
+               uNumTaps, 
+               uWindowFunctionId );
 
     // -----------------------------------------------------------------------
     // Initialize the Spectrometer
@@ -307,7 +260,6 @@ int main(int argc, char* argv[])
     if (uStopCycles > 0) { spec.setStopCycles(uStopCycles); }
     if (dStopSeconds > 0) { spec.setStopSeconds(dStopSeconds); }
     if (!sStopTime.empty()) { spec.setStopTime(sStopTime); }
-
 
     // -----------------------------------------------------------------------
     // Take data until the controller tell us it is time to stop

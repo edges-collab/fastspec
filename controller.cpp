@@ -463,7 +463,15 @@ bool Controller::run(int iMode) {
 
       // Abort if valid existing process, otherwise record our process info
       if (bExistingProc) {
+        
+        printf("Controller: An instance of FASTSPEC is already running.  Use 'fastspec stop'\n");
+        printf("Controller: to gracefully temrinate the existing instance.  Aborting...\n\n");
+
+        // Change the mode to ABORT so the deconstructor doesn't delete
+        // the PID file that belongs to the other process.
+        m_iMode = CTRL_MODE_ABORT;
         return false;
+
       } else {
         printf("Controller: Writing this PID (%d) to " PID_FILE "\n", getpid());
         writeControlFile();
@@ -484,7 +492,7 @@ bool Controller::run(int iMode) {
       return false;
       break;
 
-    // Stop execution of an existing instance if a valid pid exists
+    // Forcibly kill execution of an existing instance if a valid pid exists
     case CTRL_MODE_KILL:
 
       if (bExistingProc) {
@@ -508,6 +516,12 @@ bool Controller::run(int iMode) {
       
       printf("Controller: No valid existing instance found\n");
       return false;
+      break;
+
+    // Allow the app to show help without starting a new control file
+    case CTRL_MODE_HELP:
+     
+      return true;
       break;
 
     // Tell existing instance to stop plotting

@@ -12,6 +12,8 @@
 #define CTRL_MODE_SHOW          3
 #define CTRL_MODE_HIDE          4
 #define CTRL_MODE_KILL          5
+#define CTRL_MODE_HELP          6
+#define CTRL_MODE_ABORT         7
 
 #include <string>
 #include <unistd.h>     // pid

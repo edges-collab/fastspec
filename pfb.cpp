@@ -11,8 +11,9 @@
 // ----------------------------------------------------------------------------
 // Constructor
 // ----------------------------------------------------------------------------
-PFB::PFB(unsigned int uNumThreads, unsigned int uNumBuffers, 
-                 unsigned int uNumChannels, unsigned int uNumTaps)
+PFB::PFB( unsigned int uNumThreads, unsigned int uNumBuffers, 
+          unsigned int uNumChannels, unsigned int uNumTaps, 
+          unsigned int uWindow )
 {
   m_uNumTaps = uNumTaps;
   m_uNumThreads = uNumThreads;
@@ -25,7 +26,7 @@ PFB::PFB(unsigned int uNumThreads, unsigned int uNumBuffers,
 
   // Allocate space for window function
   m_pWindow = NULL;
-  setWindowFunction(0);
+  setWindowFunction(uWindow);
 
   // Create buffers
   printf("PFB: Creating %d buffers (%g MB)...\n", m_uNumBuffers, 
@@ -125,14 +126,14 @@ bool PFB::setWindowFunction(unsigned int uType)
       break;
 
     case 2:
-      printf ("PFB: Using sinc with Blackman Harris window function\n");
+      printf ("PFB: Using Blackman Harris (only, no sinc) window function\n");
       get_blackman_harris(m_pWindow, m_uNumSamples);
-      get_sinc(m_pWindow, m_uNumSamples, m_uNumChannels, true);
       break;
 
     case 3:
-      printf ("PFB: Using Blackman Harris (only, no sinc) window function\n");
+      printf ("PFB: Using sinc with Blackman Harris window function\n");
       get_blackman_harris(m_pWindow, m_uNumSamples);
+      get_sinc(m_pWindow, m_uNumSamples, m_uNumChannels, true);
       break;
 
     default: 
