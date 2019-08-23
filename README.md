@@ -64,7 +64,7 @@ FASTSPEC accepts many configuration settings, all of which are available through
 (Spectrometer) -A2 --sim_cw_amp2: 0.02
 (Spectrometer) -AN --sim_noise_amp: 0.001
 
-The first term (e.g. 'Spectrometer') provides the .ini section under which the option is stored when entered into a configuratio nfile.  The second term (e.g. '-p') is a shorthand command line flag for setting a parameter value.  The third term (e.g. 'show_plots') provides the paramater name in the .ini file.  It can also be used on the command line as '--show_plots [value]'.  Command line flags override any values provided in a .ini file.
+The first term (e.g. 'Spectrometer') provides the .ini section under which the option is stored when entered into a configuration file.  The second term (e.g. '-p') is a shorthand command line flag for setting a parameter value.  The third term (e.g. 'show_plots') provides the paramater name in the .ini file.  It can also be used on the command line as '--show_plots [value]'.  Command line flags override any values provided in a .ini file.
 
 Some key parameters are:
 
