@@ -117,7 +117,7 @@ int main(int argc, char* argv[])
     ctrl.setArgs(argc, argv);
 
     // Start in the commanded mode 
-    int iCtrlMode = CTRL_MODE_START;
+    int iCtrlMode = ctrl.getOptionBool("[ARGS]", "start", "start", true) ? CTRL_MODE_START : iCtrlMode;
     iCtrlMode = ctrl.getOptionBool("[ARGS]", "stop", "stop", false) ? CTRL_MODE_STOP : iCtrlMode;
     iCtrlMode = ctrl.getOptionBool("[ARGS]", "show", "show", false) ? CTRL_MODE_SHOW : iCtrlMode;
     iCtrlMode = ctrl.getOptionBool("[ARGS]", "hide", "hide", false) ? CTRL_MODE_HIDE : iCtrlMode;
