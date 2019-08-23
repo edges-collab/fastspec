@@ -68,7 +68,7 @@ The first term (e.g. 'Spectrometer') provides the .ini section under which the o
 
 Some key parameters are:
 
--f: Specify an output file.  If not specified, output files are determined from the datadir parameter in the config file.
+-f: Specify an output file.  Overwrites any existing file at the specified path.  If no output file is specified on the command line or in a .ini file, FASTSPEC automatically determines output file paths from the datadir, site, and instrument parameters along with the time in UTC when spectra from each switch cycle is written.
           
 -h: View this help message.
 
