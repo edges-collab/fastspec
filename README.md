@@ -27,7 +27,7 @@ Compile FASTSPEC by entering the fastspec directory and using 'make' to compile 
 
 * make simulate - generates a mock digitizer data stream and processes it identically to the "single" configuration above. A simulated receiver switch is used so no physical hardware is controlled.
           
-Use 'sudo make [target]' when building to compile and install the resulting executable in /usr/local/bin. It will also ensure the s-bit is set for versions that need access to the parallel port.
+Use 'sudo make [target]' when building allow installing the resulting executable in /usr/local/bin. It will also ensure the s-bit is set for versions that need access to the parallel port.
 
 RUNNING
 
@@ -39,13 +39,13 @@ RUNTIME CONFIGURATION
 
 FASTSPEC accepts many configuration settings, all of which are available through command line arguments and by using a .ini configuration file.  See 'example.ini' for a sample configuration file.  Below is a list of supported configuration settings and sample values:
 
-([ARGS ONLY]) start --start: 0
-([ARGS ONLY]) stop --stop: 0
-([ARGS ONLY]) show --show: 0
-([ARGS ONLY]) hide --hide: 0
-([ARGS ONLY]) kill --kill: 0
-([ARGS ONLY]) -h --help: 1
-([ARGS ONLY]) -i --inifile: ./fastspec.ini
+* ([ARGS ONLY]) start --start: 0
+* ([ARGS ONLY]) stop --stop: 0
+* ([ARGS ONLY]) show --show: 0
+* ([ARGS ONLY]) hide --hide: 0
+* ([ARGS ONLY]) kill --kill: 0
+* ([ARGS ONLY]) -h --help: 1
+* ([ARGS ONLY]) -i --inifile: ./fastspec.ini
 
 (Installation) -d --datadir: /home/user/data
 (Installation) -z --site: mro
@@ -88,7 +88,7 @@ PROCESS CONTROL
 
 FASTSPEC can also be called to control the behavior of an already running instance.  Four commands are supported:
 
-hidd: Send HIDE PLOTS signal to an already running FASTSPEC instance.
+hide: Send HIDE PLOTS signal to an already running FASTSPEC instance.
 kill: Send 'kill -9' signal to an already running FASTSPEC instance. 
 show: Send SHOW PLOTS signal to an already running FASTSPEC instance.
 stop: Send STOP signal to an already running FASTSPEC instance.
