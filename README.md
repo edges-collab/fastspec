@@ -11,7 +11,7 @@ Prior to building, ensure the following dependencies are installed on the system
 
 * fftw3f-dev (for single precision versions)
 
-* fft3-dev (for double-precision versions) 
+* fftw3-dev (for double-precision versions) 
 
 * sig_px14400 (not needed for simulator version)
 
