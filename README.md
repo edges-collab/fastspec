@@ -46,16 +46,16 @@ Each heading (e.g. 'Spectrometer') provides the `.ini` section under which the o
 * `show --show`: 0
 * `hide --hide`: 0
 * `kill --kill`: 0
-* `-h/--help`: 1
-* `-i/--inifile`: `./fastspec.ini`
+* `-h --help`: 1
+* `-i --inifile`: `./fastspec.ini`
 
 #### Installation
-* `-d/--datadir`: `/home/user/data`
-* `-z/--site`: mro
-* `-j/--instrument`: low1 
+* `-d --datadir`: `/home/user/data`
+* `-z --site`: mro
+* `-j --instrument`: low1 
 
 #### Spectrometer
-* `-f/--output_file`: 
+* `-f --output_file`: 
 * `-o --switch_io_port`: 0x3010
 * `-e --switch_delay`: 0.5
 * `-l --input_channel`: 1 
@@ -81,7 +81,7 @@ Each heading (e.g. 'Spectrometer') provides the `.ini` section under which the o
 
 Some key parameters are:
 
-* `-f`: Specify an output file.  Overwrites any existing file at the specified path.  If no output file is specified on the command line or in a .ini file, FASTSPEC automatically determines output file paths from the datadir, site, and instrument parameters along with the time in UTC when spectra from each switch cycle is written.      
+* `-f`: Specify an output file.  Overwrites any existing file at the specified path.  If no output file is specified on the command line or in a .ini file, FASTSPEC automatically determines output file paths from the datadir, site, and instrument parameters along with the time in UTC when spectra from each switch cycle are written.      
 * `-h`: View this help message.
 * `-i`: Specify the `.ini` configuration file.  If not specified, the default configuration file is tried (usually ./fastspec.ini)
 
