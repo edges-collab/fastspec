@@ -23,6 +23,7 @@
 #include "switch.h"
 #include "utility.h"
 #include "controller.h"
+#include "version.h"
 #include <fstream>      // ifstream, ofstream, ios
 
 
@@ -44,7 +45,7 @@ void print_help()
 {
   printf("\n");
   printf("| ------------------------------------------------------------------------\n");
-  printf("| FASTSPEC - HELP\n");
+  printf("| FASTSPEC " VERSION " - HELP\n");
   printf("| ------------------------------------------------------------------------\n\n"); 
 
   printf("FASTPEC is a spectrometer for the EDGES instrument.  It controls the\n");
@@ -105,7 +106,7 @@ int main(int argc, char* argv[])
 
     printf("\n");
     printf("| ------------------------------------------------------------------------\n");
-    printf("| FASTSPEC\n");
+    printf("| FASTSPEC " VERSION "\n");
     printf("| ------------------------------------------------------------------------\n");
     printf("\n");  
 

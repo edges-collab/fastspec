@@ -6,6 +6,7 @@
 #include <limits>       // numeric_limits<int>::max();
 #include "utility.h"    // font colors
 #include "controller.h"
+#include "version.h"
 
 
 
@@ -363,12 +364,23 @@ void Controller::onSpectrometerData( Accumulator& acc0, Accumulator& acc1,
 
   // If needed, start a new file and write the header
   if (bStartFile) {
+
+    // Make the directory structure
+    if (!make_path(get_path(m_sOutput), 0775)) {
+      printf("Controller: Failed to make path to new .acq file.\n");
+      return;
+    }
+    
+    // Write the header
     std::ofstream fs;
     fs.open(m_sOutput);
-    if (fs.is_open()) {
-      fs << m_strConfig;
-      fs.close();
+    if (!fs.is_open()) {
+      printf("Controller: Failed to write header to new .acq file.\n");
+      return;
     }
+    fs << "; FASTSPEC " << VERSION << std::endl;
+    fs << m_strConfig;
+    fs.close();
   }
 
   // Write the data
