@@ -4,11 +4,16 @@
 #ifdef SIMULATE
   #include "pxsim.h"
   #include "swsim.h"
-  #define PX_DIGITIZER PXSim
+  #define DIGITIZER PXSim
   #define SWITCH SWSim
 #else
-  #include "pxboard.h"
-  #define PX_DIGITIZER PXBoard
+  #ifdef RAZORMAX
+    #include "razormax.h"
+    #define DIGITIZER RazorMax
+  #else
+    #include "pxboard.h"
+    #define DIGITIZER PXBoard
+  #endif
   #ifdef MEZIO
     #include "swneuosys.h"
     #define SWITCH SWNeuosys
@@ -17,6 +22,11 @@
     #define SWITCH SWParallelPort
   #endif
 #endif
+
+// *** JUST FOR TESTING --- REMOVE LATER *** //
+#define SWITCH SWSim
+#include "swsim.h"
+
 
 #include "pfb.h"
 #include "spectrometer.h"
@@ -221,12 +231,13 @@ int main(int argc, char* argv[])
     // -----------------------------------------------------------------------
     // Initialize the digitizer board
     // -----------------------------------------------------------------------       
-    PX_DIGITIZER dig;
+    DIGITIZER dig;
     dig.setInputChannel(uInputChannel);
     dig.setVoltageRange(1, uVoltageRange);
     dig.setVoltageRange(2, uVoltageRange);
     dig.setAcquisitionRate(dAcquisitionRate);
     dig.setTransferSamples(uSamplesPerTransfer); // should be a multiple of number of FFT samples
+
 
     #ifdef SIMULATE
       dig.setSignal(dCWFreq1, dCWAmp1, dCWFreq2, dCWAmp2, dNoiseAmp);

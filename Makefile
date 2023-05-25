@@ -10,10 +10,24 @@ CFLAGS := -Wall -O3 -mtune=native -std=c++0x -L/usr/lib
 MEZIO := -lwdt_dio -DMEZIO
 DOUBLE := -lfftw3 -DFFT_DOUBLE_PRECISION
 
-SIMULATE_SRCS := $(filter-out pxboard.cpp, $(SRCS))
+SIMULATE_SRCS := $(filter-out pxboard.cpp razormax.cpp, $(SRCS))
 SIMULATE_LIBS := $(filter-out -lsig_px14400, $(LIBS)) -DSIMULATE
 
+
+RAZORMAX_LIBS := -lCsSsm -lCsAppSupport -lfftw3f -pthread -lrt -DRAZORMAX
+RAZORMAX_SRCS := $(filter-out gensamples.cpp pxboard.cpp, $(wildcard *.cpp))
+RAZORMAX_INCS := -I/home/jdbowman/gati-linux-driver/Sdk/CsAppSupport -I/home/jdbowman/gati-linux-driver/Sdk/C_Common -I/home/jdbowman/gati-linux-driver/Include/Public
+
 .PHONY : clean all
+
+razormax : $(RAZORMAX_SRCS)
+	@echo "Building "$(TARGET)" ("$@")..."
+	@g++ $^ -o $(TARGET)_$@ $(CFLAGS) $(RAZORMAX_LIBS) $(RAZORMAX_INCS) 
+	chmod u+s $(TARGET)_$@
+	#cp $(TARGET)_$@ $(INSTALL)/$(TARGET)_$@
+	#chmod 755 $(INSTALL)/$(TARGET)_$@
+	#chmod u+s $(INSTALL)/$(TARGET)_$@
+	@echo "Done."
 
 single : $(SRCS)
 	@echo "Building "$(TARGET)" ("$@")..."
