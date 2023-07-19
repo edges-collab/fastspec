@@ -1,11 +1,14 @@
 #ifndef _CHANNELIZER_H_
 #define _CHANNELIZER_H_
 
-#ifdef FFT_DOUBLE_PRECISION
-	#define CHANNELIZER_DATA_TYPE					double
-#else
+#if defined FFT_DOUBLE_PRECISION
+  #define CHANNELIZER_DATA_TYPE		      double
+#elif defined FFT_SINGLE_PRECISION
   #define CHANNELIZER_DATA_TYPE         float
+#elif
+  #error Aborted in channelizer.h because FFT precision was not explicitly defined.
 #endif
+
 
 struct ChannelizerData {
   CHANNELIZER_DATA_TYPE* pData;

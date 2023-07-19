@@ -7,7 +7,7 @@
 #include "channelizer.h"
 #include "buffer.h"
 
-#ifdef FFT_DOUBLE_PRECISION
+#if defined FFT_DOUBLE_PRECISION
   #define FFT_REAL_TYPE           double
   #define FFT_COMPLEX_TYPE        fftw_complex
   #define FFT_PLAN_TYPE           fftw_plan
@@ -16,7 +16,7 @@
   #define FFT_DESTROY_PLAN        fftw_destroy_plan
   #define FFT_MALLOC              fftw_malloc
   #define FFT_FREE                fftw_free
-#else
+#elif defined FFT_SINGLE_PRECISION
   #define FFT_REAL_TYPE           float
   #define FFT_COMPLEX_TYPE        fftwf_complex
   #define FFT_PLAN_TYPE           fftwf_plan
@@ -25,7 +25,10 @@
   #define FFT_DESTROY_PLAN        fftwf_destroy_plan
   #define FFT_MALLOC              fftwf_malloc
   #define FFT_FREE                fftwf_free
+#elif
+  #error Aborted in pfb.h because FFT precision was not explicitly defined.
 #endif
+
 
 #define THREAD_SLEEP_MICROSECONDS 5
 

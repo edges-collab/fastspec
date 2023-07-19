@@ -7,11 +7,12 @@
 
 using namespace std;
 
-
-#ifdef FFT_DOUBLE_PRECISION
+#if defined FFT_DOUBLE_PRECISION
   #define BUFFER_DATA_TYPE          double
-#else
+#elif defined FFT_SINGLE_PRECISION
 	#define BUFFER_DATA_TYPE					float
+#elif
+  #error Aborted in buffer.h because FFT precision was not explicitly defined.
 #endif
 
 // A circular buffer based on an iterator architecture and implemented

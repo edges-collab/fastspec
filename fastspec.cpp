@@ -1,32 +1,26 @@
 
 #define DEFAULT_INI_FILE "./fastspec.ini" 
 
-#ifdef SIMULATE
+// Handle the digitizer configuration compiler flags
+#if defined DIG_RAZORMAX
+  #include "razormax.h"
+#elif defined DIG_PXBOARD
+  #include "pxboard.h"
+#elif defined DIG_PXSIM
   #include "pxsim.h"
-  #include "swsim.h"
-  #define DIGITIZER PXSim
-  #define SWITCH SWSim
-#else
-  #ifdef RAZORMAX
-    #include "razormax.h"
-    #define DIGITIZER RazorMax
-  #else
-    #include "pxboard.h"
-    #define DIGITIZER PXBoard
-  #endif
-  #ifdef MEZIO
-    #include "swneuosys.h"
-    #define SWITCH SWNeuosys
-  #else
-    #include "swparallelport.h"
-    #define SWITCH SWParallelPort
-  #endif
 #endif
-
-// *** JUST FOR TESTING --- REMOVE LATER *** //
-#define SWITCH SWSim
-#include "swsim.h"
-
+  
+// Handle the switch configuration compiler flags
+#if defined SW_MEZIO
+  #include "swneuosys.h"
+  #define SWITCH SWNeuosys
+#elif defined SW_PARALLEL
+  #include "swparallelport.h"
+  #define SWITCH SWParallelPort
+#elif defined SW_SIM
+  #include "swsim.h"
+  #define SWITCH SWSim
+#endif
 
 
 #include "pfb.h"
@@ -176,7 +170,7 @@ int main(int argc, char* argv[])
     bool bPlot                = ctrl.getOptionBool("Spectrometer", "show_plots", "-p", false);    
     long uPlotBin             = ctrl.getOptionInt("Spectrometer", "plot_bin", "-B", 1);  
 
-    #ifdef SIMULATE
+    #ifdef DIG_PXSIM
       double dCWFreq1         = ctrl.getOptionReal("Spectrometer", "sim_cw_freq1", "-F1", 75);
       double dCWAmp1          = ctrl.getOptionReal("Spectrometer", "sim_cw_amp1", "-A1", 0.3);
       double dCWFreq2         = ctrl.getOptionReal("Spectrometer", "sim_cw_freq2", "-F2", 40);
@@ -232,16 +226,19 @@ int main(int argc, char* argv[])
     // -----------------------------------------------------------------------
     // Initialize the digitizer board
     // -----------------------------------------------------------------------       
-    DIGITIZER dig;
-    //dig.setInputChannel(uInputChannel);
-    //dig.setVoltageRange(1, uVoltageRange);
-    //dig.setVoltageRange(2, uVoltageRange);
-    dig.setAcquisitionRate(dAcquisitionRate);
-    dig.setVoltageRange(2000);
-    dig.setTransferSamples(uSamplesPerTransfer); // should be a multiple of number of FFT samples
-
-
-    #ifdef SIMULATE
+       
+    #if defined DIG_RAZORMAX
+      RazorMax dig; 
+      dig.setAcquisitionRate(dAcquisitionRate);
+      dig.setVoltageRange(2000); // need to move to ini file
+      dig.setTransferSamples(uSamplesPerTransfer); // should be a multiple of number of FFT samples
+    #elif defined DIG_PXBOARD
+      PXBoard dig;
+      dig.setInputChannel(uInputChannel);
+      dig.setVoltageRange(1, uVoltageRange);
+      dig.setVoltageRange(2, uVoltageRange);
+    #elif defined DIG_PXSIM
+      PXSim dig;
       dig.setSignal(dCWFreq1, dCWAmp1, dCWFreq2, dCWAmp2, dNoiseAmp);
     #endif
 
