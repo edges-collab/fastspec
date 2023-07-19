@@ -28,6 +28,7 @@
 #include "swsim.h"
 
 
+
 #include "pfb.h"
 #include "spectrometer.h"
 #include "switch.h"
@@ -232,10 +233,11 @@ int main(int argc, char* argv[])
     // Initialize the digitizer board
     // -----------------------------------------------------------------------       
     DIGITIZER dig;
-    dig.setInputChannel(uInputChannel);
-    dig.setVoltageRange(1, uVoltageRange);
-    dig.setVoltageRange(2, uVoltageRange);
+    //dig.setInputChannel(uInputChannel);
+    //dig.setVoltageRange(1, uVoltageRange);
+    //dig.setVoltageRange(2, uVoltageRange);
     dig.setAcquisitionRate(dAcquisitionRate);
+    dig.setVoltageRange(2000);
     dig.setTransferSamples(uSamplesPerTransfer); // should be a multiple of number of FFT samples
 
 

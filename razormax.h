@@ -4,12 +4,7 @@
 #include <functional>
 #include "digitizer.h"
 
-#include <CsAppSupport.h>
-#include "CsTchar.h"
-#include "CsSdkMisc.h"
-#include "CsSdkUtil.h"
-#include "CsExpert.h"
-#include <CsPrototypes.h>
+#include <CsTypes.h>
 
 // ---------------------------------------------------------------------------
 //
@@ -25,18 +20,26 @@ class RazorMax : public Digitizer {
   private:
 
     // Member variables
-    double                      m_dAcquisitionRate;
+    unsigned int                m_uAcquisitionRate;
     unsigned int                m_uInputChannel;
-    unsigned int                m_uVoltageRange1;
-    unsigned int                m_uVoltageRange2;
+    unsigned int                m_uVoltageRange;
     unsigned int                m_uSamplesPerTransfer;
-    unsigned int                m_uBoardRevision;
-    unsigned int                m_uSerialNumber;
+    unsigned int                m_uBytesPerTransfer;
+    unsigned int                m_uSegmentTail_Bytes;
+    unsigned int                m_u32BoardIndex; 
+    //unsigned int                m_u32BufferSizeBytes;
+    //unsigned int                m_u32TransferSizeSamples; // The actual number of samples after padding the buffer to DMA boundary
     CSHANDLE                    m_hBoard;
     void*                       m_pBuffer1; 
     void*                       m_pBuffer2;
     DigitizerReceiver*          m_pReceiver;
     bool                        m_bStop;
+
+    // Diagnostic information functions
+    bool printAcquisitionConfig();
+    bool printChannelConfig(unsigned int);
+    bool printTriggerConfig(unsigned int);
+    bool printBoardInfo();
 
   public:
 
@@ -48,9 +51,9 @@ class RazorMax : public Digitizer {
     bool connect(unsigned int);
     void disconnect();
 
-    bool setAcquisitionRate(double);
+    bool setAcquisitionRate(unsigned int);
     bool setInputChannel(unsigned int);
-    bool setVoltageRange(unsigned int, unsigned int);
+    bool setVoltageRange(unsigned int);
     bool setTransferSamples(unsigned int);
 
     void setCallback(DigitizerReceiver*);
