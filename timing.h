@@ -225,7 +225,7 @@ class TimeKeeper {
     std::string getFileString(int uLevel) const
     {
       std::string sDateString;
-      char txt[32];
+      char txt[256];
 
       switch (uLevel) 
       {
@@ -256,7 +256,7 @@ class TimeKeeper {
     std::string getDateTimeString(int uLevel) const
     {
       std::string sDateString;
-      char txt[32];
+      char txt[256];
 
       switch (uLevel) 
       {
