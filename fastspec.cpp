@@ -14,7 +14,7 @@
 #if defined SW_MEZIO
   #include "swneuosys.h"
   #define SWITCH SWNeuosys
-#elif defined SW_PARALLEL
+#elif defined SW_PARALLELPORT
   #include "swparallelport.h"
   #define SWITCH SWParallelPort
 #elif defined SW_SIM
