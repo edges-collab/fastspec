@@ -7,16 +7,19 @@
 # Setup the digitizer configuration
 ifeq ($(digitizer), pxboard)
 	DIG_SRCS := pxboard.cpp
+	DIG_HDRS := pxboard.h
 	DIG_LIBS := -lsig_px14400
 	DIG_DEFS := -DDIG_PXBOARD
 	DIG_INCS := 
 else ifeq ($(digitizer), pxsim)
-	DIG_SRCS := 
+	DIG_SRCS :=
+	DIG_HDRS := pxsim.h
 	DIG_LIBS := 
 	DIG_DEFS := -DDIG_PXSIM
 	DIG_INCS := 
 else ifeq ($(digitizer), razormax)
 	DIG_SRCS := razormax.cpp
+	DIG_HDRS := razormax.h
 	DIG_LIBS := -lCsSsm -lCsAppSupport 
 	DIG_DEFS := -DDIG_RAZORMAX	
 	DIG_INCS := \
@@ -30,12 +33,15 @@ endif
 
 # Setup the switch configuration
 ifeq ($(switch), sim)
+	SW_HDRS := swsim.h
 	SW_LIBS :=
 	SW_DEFS := -DSW_SIM
-else ifeq ($(switch), parallel)
+else ifeq ($(switch), parallelport)
+	SW_HDRS := swparallelport.h
 	SW_LIBS :=
-	SW_DEFS := -DSW_PARALLEL
-else ifeq ($(switch), parallel)
+	SW_DEFS := -DSW_PARALLELPORT
+else ifeq ($(switch), mezio)
+	SW_HDRS := swneuosys.h
 	SW_LIBS := -lwdt_dio
 	SW_DEFS := -DSW_MEZIO
 else
@@ -50,7 +56,7 @@ FFT_DEFS := -DFFT_SINGLE_PRECISION
 ifeq ($(precision), single)
   # Do nothing, use default values above
 else ifeq ($(precision), double)
-	FFT_LIBS := -lfftw3f		 
+	FFT_LIBS := -lfftw3	 
 	FFT_DEFS := -DFFT_DOUBLE_PRECISION
 else
 	# Proceed with default (single precision)
@@ -71,7 +77,11 @@ TARGET := $(TARGET_BASE)_$(digitizer)_$(switch)_$(precision)
 INSTALL := /usr/local/bin
 
 # Files and libraries shared by all configurations
-CORE_SRCS := $(filter-out gensamples.cpp pxboard.cpp razormax.cpp, $(wildcard *.cpp))
+CORE_SRCS := buffer.cpp fastspec.cpp ini.cpp spectrometer.cpp controller.cpp \
+  pfb.cpp utility.cpp 
+CORE_HDRS := accumulator.h controller.h pfb.h switch.h version.h buffer.h \
+  digitizer.h spawn.h timing.h wdt_dio.h channelizer.h ini.h spectrometer.h \
+  utility.h
 CORE_LIBS := -pthread -lrt
 CORE_CFLAGS := -Wall -O3 -mtune=native -std=c++0x -L/usr/lib
 
@@ -85,7 +95,7 @@ CORE_CFLAGS := -Wall -O3 -mtune=native -std=c++0x -L/usr/lib
 
 # TARGET -- $(TARGET):  Builds the executable using the options specified on 
 #                       make command line
-$(TARGET): $(CORE_SRCS) $(DIG_SRCS) $(SW_SRCS)
+$(TARGET): $(CORE_SRCS) $(DIG_SRCS) $(SW_SRCS) $(DIG_HDRS) $(SW_HDRS)
 
 ifdef ERROR_DIG
 	# Abort with error message
@@ -114,8 +124,9 @@ endif
 	@echo "Building $@..."
 	@echo ""
 	
-	@g++ $^ -o $(TARGET) $(CORE_LIBS) $(CORE_CFLAGS) $(DIG_LIBS) $(DIG_INCS) \
-	  $(DIG_DEFS) $(SW_LIBS) $(SW_DEFS) $(FFT_LIBS) $(FFT_DEFS) 
+	@g++ $(CORE_SRCS) $(DIG_SRCS) $(SW_SRCS) -o $(TARGET) $(CORE_LIBS) \
+	  $(CORE_CFLAGS) $(DIG_LIBS) $(DIG_INCS) $(DIG_DEFS) $(SW_LIBS) $(SW_DEFS) \
+	  $(FFT_LIBS) $(FFT_DEFS) 
 	@chmod u+s $(TARGET)
 	
 	@echo "Done.\n"
