@@ -130,7 +130,7 @@ bool RazorMax::connect(unsigned int uBoardNumber)
 	printf("\nSegment tail in bytes: %d\n", m_uSegmentTail_Bytes);
 
   // Allocate buffers using samples per transfer, sample size, and DMA boundary
-  m_uSamplesPerTransfer = m_uSamplesPerTransfer; // 524288;  
+  // m_uSamplesPerTransfer = 524288;  
   m_uBytesPerTransfer = m_uSamplesPerTransfer * 2 + m_uSegmentTail_Bytes;  // 2 bytes per samplecsAcquisitionCfg.u32SampleSize; 
 	
 	// Bytes per transfer must be a multiple of the DMA boundary, usually 16
@@ -138,9 +138,9 @@ bool RazorMax::connect(unsigned int uBoardNumber)
 	if ( m_uBytesPerTransfer % u32DmaBoundaryBytes )
 	{
     printf("\nBytes per transfer is a not aligned to DMA boundary length.");
-    printf("\nBytes per transfer = samples per transfer * 2 + segment tail bytes.  It is currently: %d", m_uBytesPerTransfer);;
-    printf("\nSegment tail bytes are: %d", m_uSegmentTail_Bytes);
-    printf("\nTry make bytes per transfer a multiple of %d", u32DmaBoundaryBytes);
+    printf("\nBytes per transfer = samples per transfer * 2 + segment tail bytes.  It is currently: %u", m_uBytesPerTransfer);;
+    printf("\nSegment tail bytes are: %u", m_uSegmentTail_Bytes);
+    printf("\nTry make bytes per transfer a multiple of %u", u32DmaBoundaryBytes);
     disconnect();
     return false;
   }
@@ -149,7 +149,7 @@ bool RazorMax::connect(unsigned int uBoardNumber)
 	iStatus = CsStmAllocateBuffer(m_hBoard, m_u32BoardIndex,  m_uBytesPerTransfer, &m_pBuffer1);
 	if (CS_FAILED(iStatus))
 	{
-		printf("\nUnable to allocate memory for stream buffer 1.\n");
+		printf("\nUnable to allocate memory for stream buffer 1 (board index: %u, bytes: %u).\n", m_u32BoardIndex, m_uBytesPerTransfer);
 		disconnect();
 		return false;
 	}
@@ -158,7 +158,7 @@ bool RazorMax::connect(unsigned int uBoardNumber)
 	iStatus = CsStmAllocateBuffer(m_hBoard, m_u32BoardIndex,  m_uBytesPerTransfer, &m_pBuffer2);
 	if (CS_FAILED(iStatus))
 	{
-		printf("\nUnable to allocate memory for stream buffer 2.\n");
+		printf("\nUnable to allocate memory for stream buffer 2 (board index: %u, bytes: %u).\n", m_u32BoardIndex, m_uBytesPerTransfer);
 		disconnect();
 		return false;
 	}
@@ -304,6 +304,9 @@ bool RazorMax::acquire(unsigned long uNumSamplesToTransfer)
 		return false;
 	}
 	 
+	// Fill in our configuration
+	csAcquisitionCfg.u32Mode = CS_MODE_SINGLE;	// Acquisition mode of the system: see ACQUISITION_MODES in CsDefines.h
+		 
 	// Check if selected system supports Expert Stream and set the correct firmware image to be used.
 	int64	i64ExtendedOptions = 0;
 	iStatus = CsGet(m_hBoard, CS_PARAMS, CS_EXTENDED_BOARD_OPTIONS, &i64ExtendedOptions);
@@ -313,19 +316,16 @@ bool RazorMax::acquire(unsigned long uNumSamplesToTransfer)
 		printf("\nAborting acquisition.");
 		return false;
 	}
-	//printf("\nExtended board options: %d\n", i64ExtendedOptions);
-	
-	// Fill in our configuration
-	csAcquisitionCfg.u32Mode = CS_MODE_SINGLE;	// Acquisition mode of the system: see ACQUISITION_MODES in CsDefines.h
-	
+	printf("\nExtended board options: %ld\n", i64ExtendedOptions);
+
 	if (i64ExtendedOptions & CS_BBOPTIONS_STREAM)
 	{
-		//printf("\nSelecting firmware for eXpert Data Stream from image 1");
+		printf("\nSelecting firmware for eXpert Data Stream from image 1");
 		csAcquisitionCfg.u32Mode |= CS_MODE_USER1;
 	}
 	else if ((i64ExtendedOptions >> 32) & CS_BBOPTIONS_STREAM)
 	{
-		//printf("\nSelecting firmware for eXpert Stream from image 2");
+		printf("\nSelecting firmware for eXpert Stream from image 2");
 		csAcquisitionCfg.u32Mode |= CS_MODE_USER2;
 	}
 	else
@@ -531,7 +531,7 @@ bool RazorMax::printAcquisitionConfig()
 	// Display current acquisition configuration settings
 	printf("\nRazorMax Acquisition Configuration");
 	printf("\n----------------------------------");
-	printf("\nAcquisition i64SampleRate: %d", csAcquisitionCfg.i64SampleRate);
+	printf("\nAcquisition i64SampleRate: %ld", csAcquisitionCfg.i64SampleRate);
 	printf("\nAcquisition u32ExtClk: %u", csAcquisitionCfg.u32ExtClk);	
 	printf("\nAcquisition u32ExtClkSampleSkip: %u", csAcquisitionCfg.u32ExtClkSampleSkip);	
 	printf("\nAcquisition u32Mode: %u", csAcquisitionCfg.u32Mode);	
@@ -539,12 +539,12 @@ bool RazorMax::printAcquisitionConfig()
 	printf("\nAcquisition i32SampleRes: %d", csAcquisitionCfg.i32SampleRes);	
 	printf("\nAcquisition u32SampleSize: %u", csAcquisitionCfg.u32SampleSize);	
 	printf("\nAcquisition u32SegmentCount: %u", csAcquisitionCfg.u32SegmentCount);	
-	printf("\nAcquisition i64Depth: %d", csAcquisitionCfg.i64Depth);	
-	printf("\nAcquisition i64SegmentSize: %d", csAcquisitionCfg.i64SegmentSize);	
-	printf("\nAcquisition i64TriggerTimeout: %d", csAcquisitionCfg.i64TriggerTimeout);	
+	printf("\nAcquisition i64Depth: %ld", csAcquisitionCfg.i64Depth);	
+	printf("\nAcquisition i64SegmentSize: %ld", csAcquisitionCfg.i64SegmentSize);	
+	printf("\nAcquisition i64TriggerTimeout: %ld", csAcquisitionCfg.i64TriggerTimeout);	
 	printf("\nAcquisition u32TrigEnginesEn: %u", csAcquisitionCfg.u32TrigEnginesEn);	
-	printf("\nAcquisition i64TriggerDelay: %d", csAcquisitionCfg.i64TriggerDelay);	
-	printf("\nAcquisition i64TriggerHoldoff: %d", csAcquisitionCfg.i64TriggerHoldoff);	
+	printf("\nAcquisition i64TriggerDelay: %ld", csAcquisitionCfg.i64TriggerDelay);	
+	printf("\nAcquisition i64TriggerHoldoff: %ld", csAcquisitionCfg.i64TriggerHoldoff);	
 	printf("\nAcquisition i32SampleOffset: %d", csAcquisitionCfg.i32SampleOffset);	
 	printf("\nAcquisition u32TimeStampConfig: %u", csAcquisitionCfg.u32TimeStampConfig);	
 	printf("\nAcquisition i32SegmentCountHigh: %d\n", csAcquisitionCfg.i32SegmentCountHigh);	
@@ -650,7 +650,7 @@ bool RazorMax::printBoardInfo()
 	printf("\n--------------------");
 	printf("\nNumber of boards found: %u", csSysInfo.u32BoardCount);
 	printf("\nBoard name: %s", csSysInfo.strBoardName);
-	printf("\nBoard total memory size: %d", csSysInfo.i64MaxMemory);
+	printf("\nBoard total memory size: %ld", csSysInfo.i64MaxMemory);
 	printf("\nBoard vertical resolution (in bits): %u", csSysInfo.u32SampleBits);
 	printf("\nBoard sample resolution (used for voltage conversion): %d", csSysInfo.i32SampleResolution);	
 	printf("\nBoard sample size (in bytes): %u", csSysInfo.u32SampleSize);
@@ -712,7 +712,7 @@ bool RazorMax::printBoardInfo()
 		// Get the tables and print the results
 		if (pImpedanceTables != NULL) {
 			iStatus = CsGetSystemCaps(m_hBoard, CAPS_IMPEDANCES | m_uInputChannel,  pImpedanceTables,  &uBufferSize);
-			for (int i=0; i<u32ImpedanceTables; i++) {
+			for (unsigned int i=0; i<u32ImpedanceTables; i++) {
 				printf("\nChannel %d -- Impedance: %d (%s)", m_uInputChannel, pImpedanceTables[i].u32Imdepdance, pImpedanceTables[i].strText);
 			}
 
@@ -740,7 +740,7 @@ bool RazorMax::printBoardInfo()
 		// Get the tables and print the results
 		if (pRangeTables != NULL) {
 			iStatus = CsGetSystemCaps(m_hBoard, CAPS_INPUT_RANGES | m_uInputChannel,  pRangeTables,  &uBufferSize);
-			for (int i=0; i<u32RangeTables; i++) {
+			for (unsigned int i=0; i<u32RangeTables; i++) {
 				printf("\nChannel %d -- Input Range: %d (%s)", m_uInputChannel, pRangeTables[i].u32InputRange, pRangeTables[i].strText);
 			}
 
@@ -771,10 +771,10 @@ bool RazorMax::printBoardInfo()
 			iStatus = CsGetSystemCaps(m_hBoard, CAPS_SAMPLE_RATES,  pRateTables,  &uBufferSize);
 			
 			if (CS_FAILED(iStatus)) {
-			  printf("\nFailed to get RazorMax sample rate info -- uBufferSize: %d, table size: %d, u32RateTables: %d\n", uBufferSize, sizeof(CSSAMPLERATETABLE), u32RateTables);
+			  printf("\nFailed to get RazorMax sample rate info -- uBufferSize: %u, table size: %ld, u32RateTables: %u\n", uBufferSize, sizeof(CSSAMPLERATETABLE), u32RateTables);
 			} else {
-			  for (int i=0; i<u32RateTables; i++) {
-				  printf("\nSample Rate: %d (%s)", pRateTables[i].i64SampleRate, pRateTables[i].strText);
+			  for (unsigned int i=0; i<u32RateTables; i++) {
+				  printf("\nSample Rate: %ld (%s)", pRateTables[i].i64SampleRate, pRateTables[i].strText);
 			  }
 			}
 
