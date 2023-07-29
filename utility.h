@@ -53,7 +53,7 @@ std::string construct_filepath_name(const std::string&,
 bool append_switch_cycle( const std::string&, Accumulator&, Accumulator&, 
                           Accumulator& );
 
-bool append_switch_pos( const char*, const ACCUM_TYPE*, unsigned int,  
+bool append_switch_pos( const char*, const ACCUM_DATA_TYPE*, unsigned int,  
                         unsigned int, unsigned int, unsigned int, unsigned int, 
                         unsigned int, unsigned int, double, double, double,  
                         unsigned int, double, double, double, unsigned long);

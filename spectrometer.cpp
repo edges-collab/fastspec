@@ -180,7 +180,7 @@ void Spectrometer::run()
       m_pCurrentAccum->setStartTime();
 
       // Acquire data
-      m_pDigitizer->acquire(m_uNumSamplesPerAccumulation);
+      m_pDigitizer->acquire();
 
       // Note the stop time
       m_pCurrentAccum->setStopTime();
@@ -339,30 +339,24 @@ void Spectrometer::setStopTime(const string& strDateTime)
 //                 that chunk of data.  Returns total number of samples 
 //                 successfully processed into a Channelizer buffer.
 // ----------------------------------------------------------------------------
-unsigned long Spectrometer::onDigitizerData( unsigned short* pBuffer, 
+unsigned long Spectrometer::onDigitizerData( SAMPLE_DATA_TYPE* pBuffer, 
                                              unsigned int uBufferLength,
-                                             unsigned long uTransferredSoFar ) 
+                                             unsigned long uTransferredSoFar,
+                                             double dScale,
+                                             double dOffset ) 
 {
   unsigned int uIndex = 0;
   unsigned int uAdded = 0;
-  //unsigned int uDropped = 0;
-
+  
   // Loop over the transferred data and enter it into the channelizer buffer
   while ( ((uIndex + m_uNumFFT) <= uBufferLength) 
          && (uTransferredSoFar < m_uNumSamplesPerAccumulation)) {
     
-
     // Try to add to the channelizer buffer
-    if (m_pChannelizer->push(&(pBuffer[uIndex]), m_uNumFFT)) { 
-
+    if (m_pChannelizer->push(&(pBuffer[uIndex]), m_uNumFFT, dScale, dOffset)) { 
       uTransferredSoFar += m_uNumFFT;
       uAdded++;
-
-    } //else {
-
-      // No buffers were available so we'll drop the chunk and move on
-      //uDropped++;
-    //}
+    } 
 
     // Increment the index to the next chunk of transferred data
     uIndex += m_uNumFFT;
@@ -370,8 +364,6 @@ unsigned long Spectrometer::onDigitizerData( unsigned short* pBuffer,
 
   // Keep a permanent record of how many samples were dropped
   m_pCurrentAccum->addDrops(uBufferLength - uAdded * m_uNumFFT);
-
-  //printf("onTransfer: added blocks here: %u, dropped blocks here: %u, total samples: %lu\n", uAdded, uDropped, uTransferredSoFar);
 
   // Return the total number of transferred samples that were successfully
   // entered in the FFTPool buffer for processing.

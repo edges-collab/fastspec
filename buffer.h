@@ -7,12 +7,12 @@
 
 using namespace std;
 
-#if defined FFT_DOUBLE_PRECISION
-  #define BUFFER_DATA_TYPE          double
-#elif defined FFT_SINGLE_PRECISION
-	#define BUFFER_DATA_TYPE					float
-#elif
-  #error Aborted in buffer.h because FFT precision was not explicitly defined.
+#ifndef SAMPLE_DATA_TYPE
+  #error Aborted in buffer.h because SAMPLE_DATA_TYPE was not defined.
+#endif
+
+#ifndef BUFFER_DATA_TYPE
+  #error Aborted in buffer.h because BUFFER_DATA_TYPE was not defined.
 #endif
 
 // A circular buffer based on an iterator architecture and implemented
@@ -24,6 +24,12 @@ class Buffer {
 
 	public:
 
+  // Enumerator for pushing data of different types into buffer (avoiding templates)
+  typedef enum pushType {
+    uint16 = 0,
+    int16 = 1
+  } pushType;
+  
 	// Nested class for the items used in the internal <list>.   
 	// These items have a member variable to track the number of 
 	// iterators pointing to each item.
@@ -43,7 +49,7 @@ class Buffer {
 			~item() {}
 
 			// Member variables
-			BUFFER_DATA_TYPE*		pData;
+			BUFFER_DATA_TYPE*		  pData;
 			unsigned int 				uHolds;
 	};
 
@@ -105,7 +111,8 @@ class Buffer {
 	  bool push(BUFFER_DATA_TYPE*, unsigned int);
 
 	  // Push data into the buffer.  Returns false if buffer is full.
-	  bool push(unsigned short*, unsigned int);
+	  bool push(SAMPLE_DATA_TYPE*, unsigned int, double, double);
+	  
 
 	  // Returns number of holds on items currently in buffer
 	  unsigned int holds();

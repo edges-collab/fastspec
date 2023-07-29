@@ -1,5 +1,5 @@
 
-#define DEFAULT_INI_FILE "./fastspec.ini" 
+#define DEFAULT_INI_FILE "./fastspec.ini"
 
 // Handle the digitizer configuration compiler flags
 #if defined DIG_RAZORMAX
@@ -8,8 +8,10 @@
   #include "pxboard.h"
 #elif defined DIG_PXSIM
   #include "pxsim.h"
+#elif
+  #error Aborted in fastspec.cpp because digitizer flag not defined
 #endif
-  
+
 // Handle the switch configuration compiler flags
 #if defined SW_MEZIO
   #include "swneuosys.h"
@@ -20,6 +22,8 @@
 #elif defined SW_SIM
   #include "swsim.h"
   #define SWITCH SWSim
+#elif
+  #error Aborted in fastspec.cpp because switch flag not defined
 #endif
 
 
@@ -51,7 +55,7 @@ void print_help()
   printf("\n");
   printf("| ------------------------------------------------------------------------\n");
   printf("| FASTSPEC " VERSION " - HELP\n");
-  printf("| ------------------------------------------------------------------------\n\n"); 
+  printf("| ------------------------------------------------------------------------\n\n");
 
   printf("FASTPEC is a spectrometer for the EDGES instrument.  It controls the\n");
   printf("receiver switch states and acquires samples from an analog-to-digital\n");
@@ -105,7 +109,7 @@ void print_help()
 // Main
 // ----------------------------------------------------------------------------
 int main(int argc, char* argv[])
-{   
+{
     // Don't buffer stdout (so we see messages without lag)
     setbuf(stdout, NULL);
 
@@ -113,7 +117,7 @@ int main(int argc, char* argv[])
     printf("| ------------------------------------------------------------------------\n");
     printf("| FASTSPEC " VERSION "\n");
     printf("| ------------------------------------------------------------------------\n");
-    printf("\n");  
+    printf("\n");
 
 
     // -----------------------------------------------------------------------
@@ -122,7 +126,7 @@ int main(int argc, char* argv[])
     ctrl.registerHandler(on_signal);
     ctrl.setArgs(argc, argv);
 
-    // Start in the commanded mode 
+    // Start in the commanded mode
     int iCtrlMode = CTRL_MODE_START;
     iCtrlMode = ctrl.getOptionBool("[ARGS]", "start", "start", true) ? CTRL_MODE_START : iCtrlMode;
     iCtrlMode = ctrl.getOptionBool("[ARGS]", "stop", "stop", false) ? CTRL_MODE_STOP : iCtrlMode;
@@ -154,11 +158,13 @@ int main(int argc, char* argv[])
     string sOutput            = ctrl.getOptionStr("Spectrometer", "output_file", "-f", "");
     long uSwitchIOPort        = ctrl.getOptionInt("Spectrometer", "switch_io_port", "-o", 0x3010);
     double dSwitchDelay       = ctrl.getOptionReal("Spectrometer", "switch_delay", "-e", 0.5);
-    long uInputChannel        = ctrl.getOptionInt("Spectrometer", "input_channel", "-l", 2);
-    long uVoltageRange        = ctrl.getOptionInt("Spectrometer", "voltage_range", "-v", 0);
     long uSamplesPerAccum     = ctrl.getOptionInt("Spectrometer", "samples_per_accumulation", "-a", 1024L*2L*1024L*1024L);
     long uSamplesPerTransfer  = ctrl.getOptionInt("Spectrometer", "samples_per_transfer", "-t", 2*1024*1024);
     double dAcquisitionRate   = ctrl.getOptionInt("Spectrometer", "acquisition_rate", "-r", 400);
+    #ifdef DIG_PXBOARD    
+      long uInputChannel        = ctrl.getOptionInt("Spectrometer", "input_channel", "-l", 2);
+      long uVoltageRange        = ctrl.getOptionInt("Spectrometer", "voltage_range", "-v", 0);
+    #endif
     long uNumChannels         = ctrl.getOptionInt("Spectrometer", "num_channels", "-n", 65536);
     long uNumTaps             = ctrl.getOptionInt("Spectrometer", "num_taps", "-q", 5);
     long uWindowFunctionId    = ctrl.getOptionInt("Spectrometer", "window_function_id", "-w", 1);
@@ -228,15 +234,13 @@ int main(int argc, char* argv[])
     // -----------------------------------------------------------------------       
        
     #if defined DIG_RAZORMAX
-      RazorMax dig; 
-      dig.setAcquisitionRate(dAcquisitionRate);
-      dig.setVoltageRange(2000); // need to move to ini file
-      dig.setTransferSamples(uSamplesPerTransfer); // should be a multiple of number of FFT samples
+      RazorMax dig(dAcquisitionRate, uSamplesPerAccum, uSamplesPerTransfer); 
     #elif defined DIG_PXBOARD
       PXBoard dig;
+      dig.setAcquisitionRate(dAcquisitionRate); 
+      dig.setTransferSamples(uSamplesPerTransfer); 
       dig.setInputChannel(uInputChannel);
-      dig.setVoltageRange(1, uVoltageRange);
-      dig.setVoltageRange(2, uVoltageRange);
+      dig.setVoltageRange(uInputChannel, uVoltageRange);
     #elif defined DIG_PXSIM
       PXSim dig;
       dig.setSignal(dCWFreq1, dCWAmp1, dCWFreq2, dCWAmp2, dNoiseAmp);

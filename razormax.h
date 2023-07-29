@@ -14,6 +14,9 @@
 // board.  The principal method to retrieve data is "acquire", which utilizes
 // a callback function set using "setCallback".
 //
+// Use:
+// #define SAMPLE_DATA_TYPE short
+//
 // ---------------------------------------------------------------------------
 class RazorMax : public Digitizer {
 
@@ -21,19 +24,19 @@ class RazorMax : public Digitizer {
 
     // Member variables
     unsigned int                m_uAcquisitionRate;
-    unsigned int                m_uInputChannel;
-    unsigned int                m_uVoltageRange;
+    unsigned long               m_uSamplesPerAccumulation;
     unsigned int                m_uSamplesPerTransfer;
     unsigned int                m_uBytesPerTransfer;
-    unsigned int                m_uSegmentTail_Bytes;
+    unsigned int                m_uEffectiveSamplesPerTransfer;
+    unsigned int                m_uInputChannel;
     unsigned int                m_u32BoardIndex; 
-    //unsigned int                m_u32BufferSizeBytes;
-    //unsigned int                m_u32TransferSizeSamples; // The actual number of samples after padding the buffer to DMA boundary
     CSHANDLE                    m_hBoard;
     void*                       m_pBuffer1; 
     void*                       m_pBuffer2;
     DigitizerReceiver*          m_pReceiver;
     bool                        m_bStop;
+    double                      m_dScale;
+    double                      m_dOffset;
 
     // Diagnostic information functions
     bool printAcquisitionConfig();
@@ -44,22 +47,22 @@ class RazorMax : public Digitizer {
   public:
 
     // Constructor and destructor
-    RazorMax();
+    RazorMax(double, unsigned long, unsigned int);
     ~RazorMax();
 
     // Setup functions    
     bool connect(unsigned int);
     void disconnect();
 
-    bool setAcquisitionRate(unsigned int);
-    bool setInputChannel(unsigned int);
-    bool setVoltageRange(unsigned int);
-    bool setTransferSamples(unsigned int);
+    //bool setAcquisitionRate(unsigned int);
+    //bool setInputChannel(unsigned int);
+    //bool setVoltageRange(unsigned int);
+    //bool setTransferSamples(unsigned int);
 
     void setCallback(DigitizerReceiver*);
 
     // Main execution function
-    bool acquire(unsigned long);
+    bool acquire();
     void stop();
 
 };

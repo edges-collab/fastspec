@@ -10,6 +10,9 @@
 #include "switch.h"
 #include "timing.h"
 
+#ifndef SAMPLE_DATA_TYPE
+  #error Aborted in spectrometer.h because SAMPLE_DATA_TYPE was not defined.
+#endif
 
 // ---------------------------------------------------------------------------
 //
@@ -72,7 +75,7 @@ class Spectrometer : public DigitizerReceiver, ChannelizerReceiver {
     void setStopTime(const std::string&);
 
     // Callbacks
-    unsigned long onDigitizerData(unsigned short*, unsigned int, unsigned long);
+    unsigned long onDigitizerData(SAMPLE_DATA_TYPE*, unsigned int, unsigned long, double, double);
     void onChannelizerData(ChannelizerData*);
 
 };

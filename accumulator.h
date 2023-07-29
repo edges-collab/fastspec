@@ -14,14 +14,14 @@
 //
 // ---------------------------------------------------------------------------
 
-#define ACCUM_TYPE double // or float
+#define ACCUM_DATA_TYPE double
 
 class Accumulator {
 
   private:
 
     // Member variables
-    ACCUM_TYPE*     m_pSpectrum;
+    ACCUM_DATA_TYPE*     m_pSpectrum;
     unsigned int    m_uDataLength;
     unsigned int    m_uNumAccums;
     double          m_dADCmin;
@@ -140,7 +140,7 @@ class Accumulator {
       return true;
     }
 
-    ACCUM_TYPE get(unsigned int iIndex) const
+    ACCUM_DATA_TYPE get(unsigned int iIndex) const
     { 
       if (m_pSpectrum) {
         return m_pSpectrum[iIndex]; 
@@ -149,13 +149,13 @@ class Accumulator {
       }
     }
 
-    ACCUM_TYPE getADCmin() const { return m_dADCmin; }
+    ACCUM_DATA_TYPE getADCmin() const { return m_dADCmin; }
     
-    ACCUM_TYPE getADCmax() const { return m_dADCmax; }
+    ACCUM_DATA_TYPE getADCmax() const { return m_dADCmax; }
     
-    ACCUM_TYPE getChannelFactor() const { return m_dChannelFactor; }
+    ACCUM_DATA_TYPE getChannelFactor() const { return m_dChannelFactor; }
 
-    bool getCopyOfSum(ACCUM_TYPE* pOut, unsigned int uLength) const
+    bool getCopyOfSum(ACCUM_DATA_TYPE* pOut, unsigned int uLength) const
     { 
       if ((pOut == NULL) || (uLength != m_uDataLength)) {
         return false;
@@ -168,7 +168,7 @@ class Accumulator {
       return true;
     }
 
-    bool getCopyOfAverage(ACCUM_TYPE* pOut, unsigned int uLength) const
+    bool getCopyOfAverage(ACCUM_DATA_TYPE* pOut, unsigned int uLength) const
     { 
       double dNormalize = 0;
 
@@ -199,16 +199,16 @@ class Accumulator {
     
     TimeKeeper getStopTime() const { return m_stopTime; }
     
-    ACCUM_TYPE* getSum() { return m_pSpectrum; }
+    ACCUM_DATA_TYPE* getSum() { return m_pSpectrum; }
 
-    ACCUM_TYPE getTemperature() const { return m_dTemperature; }
+    ACCUM_DATA_TYPE getTemperature() const { return m_dTemperature; }
 
     unsigned long getDrops() const {return m_uDrops; }
 
     void init(unsigned int uDataLength, double dStartFreq, double dStopFreq, 
               double dChannelFactor) 
     { 
-      m_pSpectrum = (ACCUM_TYPE*) malloc(uDataLength * sizeof(ACCUM_TYPE));
+      m_pSpectrum = (ACCUM_DATA_TYPE*) malloc(uDataLength * sizeof(ACCUM_DATA_TYPE));
       m_uDataLength = uDataLength;
       m_dStartFreq = dStartFreq;
       m_dStopFreq = dStopFreq;

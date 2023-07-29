@@ -26,7 +26,7 @@
   #define FFT_MALLOC              fftwf_malloc
   #define FFT_FREE                fftwf_free
 #elif
-  #error Aborted in pfb.h because FFT precision was not explicitly defined.
+  #error Aborted in pfb.h because FFT precision was not defined.
 #endif
 
 
@@ -43,7 +43,7 @@ class PFB : public Channelizer {
     pthread_t*                    m_pThreads;
     pthread_mutex_t               m_mutexPlan;
     pthread_mutex_t               m_mutexCallback;
-    CHANNELIZER_DATA_TYPE*        m_pWindow;
+    BUFFER_DATA_TYPE*             m_pWindow;
     Buffer                        m_buffer;
     unsigned int                  m_uNumTaps;
     unsigned int                  m_uNumThreads;
@@ -70,7 +70,7 @@ class PFB : public Channelizer {
     ~PFB();
 
     // Interface functions
-    bool            push(unsigned short*, unsigned int);
+    bool            push(SAMPLE_DATA_TYPE*, unsigned int, double, double);
     void            setCallback(ChannelizerReceiver*);
     void            waitForEmpty();
 

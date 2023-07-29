@@ -9,19 +9,19 @@ ifeq ($(digitizer), pxboard)
 	DIG_SRCS := pxboard.cpp
 	DIG_HDRS := pxboard.h
 	DIG_LIBS := -lsig_px14400
-	DIG_DEFS := -DDIG_PXBOARD
+	DIG_DEFS := -DDIG_PXBOARD -DSAMPLE_DATA_TYPE="unsigned short"
 	DIG_INCS := 
 else ifeq ($(digitizer), pxsim)
 	DIG_SRCS :=
 	DIG_HDRS := pxsim.h
 	DIG_LIBS := 
-	DIG_DEFS := -DDIG_PXSIM
+	DIG_DEFS := -DDIG_PXSIM -DSAMPLE_DATA_TYPE="unsigned short"
 	DIG_INCS := 
 else ifeq ($(digitizer), razormax)
 	DIG_SRCS := razormax.cpp
 	DIG_HDRS := razormax.h
 	DIG_LIBS := -lCsSsm -lCsAppSupport 
-	DIG_DEFS := -DDIG_RAZORMAX	
+	DIG_DEFS := -DDIG_RAZORMAX	 -DSAMPLE_DATA_TYPE="short"
 	DIG_INCS := \
 	  -I/home/jdbowman/gati-linux-driver/Sdk/CsAppSupport \
 	  -I/home/jdbowman/gati-linux-driver/Sdk/C_Common \
@@ -51,13 +51,13 @@ endif
 
 # Setup the math precision configuration
 FFT_LIBS := -lfftw3f		 
-FFT_DEFS := -DFFT_SINGLE_PRECISION
+FFT_DEFS := -DFFT_SINGLE_PRECISION -DBUFFER_DATA_TYPE="float"
 
 ifeq ($(precision), single)
   # Do nothing, use default values above
 else ifeq ($(precision), double)
 	FFT_LIBS := -lfftw3	 
-	FFT_DEFS := -DFFT_DOUBLE_PRECISION
+	FFT_DEFS := -DFFT_DOUBLE_PRECISION -DBUFFER_DATA_TYPE="double"
 else
 	# Proceed with default (single precision)
 	override precision := single

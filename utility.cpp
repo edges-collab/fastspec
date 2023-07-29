@@ -125,12 +125,12 @@ bool write_plot_file( const string& sFilePath,
 {
 
   FILE* file;
-  ACCUM_TYPE* p0 = acc0.getSum();
-  ACCUM_TYPE* p1 = acc1.getSum();
-  ACCUM_TYPE* p2 = acc2.getSum();
-  ACCUM_TYPE d0;
-  ACCUM_TYPE d1;
-  ACCUM_TYPE d2;
+  ACCUM_DATA_TYPE* p0 = acc0.getSum();
+  ACCUM_DATA_TYPE* p1 = acc1.getSum();
+  ACCUM_DATA_TYPE* p2 = acc2.getSum();
+  ACCUM_DATA_TYPE d0;
+  ACCUM_DATA_TYPE d1;
+  ACCUM_DATA_TYPE d2;
   double f;
   unsigned int count = 0;  
 
@@ -278,7 +278,7 @@ bool append_switch_cycle( const string& sFilePath,
 //           multiplied by 10^5 before being converted to integer for encoding. 
 // ----------------------------------------------------------------------------
 bool append_switch_pos( const char* pchFilename, 
-                        const ACCUM_TYPE* pSpectrum, 
+                        const ACCUM_DATA_TYPE* pSpectrum, 
                         unsigned int uLength, 
                         unsigned int uSwitch, 
                         unsigned int year, unsigned int doy, 

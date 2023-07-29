@@ -30,7 +30,7 @@ PFB::PFB( unsigned int uNumThreads, unsigned int uNumBuffers,
 
   // Create buffers
   printf("PFB: Creating %d buffers (%g MB)...\n", m_uNumBuffers, 
-    ((float) m_uNumBuffers)*m_uNumFFT*sizeof(CHANNELIZER_DATA_TYPE)/1024/1024);
+    ((float) m_uNumBuffers)*m_uNumFFT*sizeof(BUFFER_DATA_TYPE)/1024/1024);
   m_buffer.allocate(m_uNumBuffers, m_uNumFFT);
 
   // Initialize the mutexes
@@ -108,7 +108,7 @@ bool PFB::setWindowFunction(unsigned int uType)
 
   // Create the window array if it doesn't already exist
   if (m_pWindow == NULL) {
-    m_pWindow = (CHANNELIZER_DATA_TYPE*) malloc(m_uNumSamples*sizeof(CHANNELIZER_DATA_TYPE));
+    m_pWindow = (BUFFER_DATA_TYPE*) malloc(m_uNumSamples*sizeof(BUFFER_DATA_TYPE));
     if (m_pWindow == NULL) {
       printf("PFB:: Failed to allocate memory for window function.");
       return false;
@@ -170,9 +170,10 @@ void PFB::waitForEmpty()
 // push -- Copies data into a buffer for processing.  If no buffers are 
 //         available, it will return false.
 // ----------------------------------------------------------------------------
-bool PFB::push(unsigned short* pIn, unsigned int uLength)
+bool PFB::push(SAMPLE_DATA_TYPE* pIn, unsigned int uLength, double dScale, 
+               double dOffset)
 {
-  return m_buffer.push(pIn, uLength);
+  return m_buffer.push(pIn, uLength, dScale, dOffset);
 
 } // push()
 
@@ -255,10 +256,10 @@ void PFB::process( Buffer::iterator& iter, FFT_REAL_TYPE* pLocal1,
 
   unsigned int i;
   unsigned int t;
-  CHANNELIZER_DATA_TYPE* pIn = NULL;
-  CHANNELIZER_DATA_TYPE* pWin = m_pWindow;
-  CHANNELIZER_DATA_TYPE dMax = 0;
-  CHANNELIZER_DATA_TYPE dMin = 0;
+  BUFFER_DATA_TYPE* pIn = NULL;
+  BUFFER_DATA_TYPE* pWin = m_pWindow;
+  BUFFER_DATA_TYPE dMax = 0;
+  BUFFER_DATA_TYPE dMin = 0;
 
   // Loop over taps of data
   for (t=0; t<m_uNumTaps; t++) {

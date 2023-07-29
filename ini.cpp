@@ -141,8 +141,8 @@ int ini_parse_stream(ini_reader reader, void* stream, ini_handler handler,
 #include <stdlib.h>
 #endif
 
-#define MAX_SECTION 50
-#define MAX_NAME 50
+#define MAX_SECTION INI_MAX_LINE // 50
+#define MAX_NAME INI_MAX_LINE // 50
 
 /* Strip whitespace chars off end of given string, in place. Return s. */
 static char* rstrip(char* s)
@@ -184,8 +184,9 @@ static char* find_chars_or_comment(const char* s, const char* chars)
 /* Version of strncpy that ensures dest (size bytes) is null-terminated. */
 static char* strncpy0(char* dest, const char* src, size_t size)
 {
-    strncpy(dest, src, size);
-    dest[size - 1] = '\0';
+    snprintf(dest, size, "%s", src); 
+//    strncpy(dest, src, size);
+//    dest[size - 1] = '\0';
     return dest;
 }
 

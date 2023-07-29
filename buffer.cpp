@@ -21,7 +21,8 @@ Buffer::Buffer() {
 // ----------------------------------------------------------------------------
 Buffer::~Buffer() { 
 
-  printf("Buffer: Maximum number of buffers used: %d of %d blocks (%.3g%%)\n", m_uMaxFullSize, m_uNumItems, 100.0*m_uMaxFullSize/m_uNumItems);
+  printf("Buffer: Maximum number of buffers used: %d of %d blocks (%.3g%%)\n", 
+    m_uMaxFullSize, m_uNumItems, 100.0*m_uMaxFullSize/m_uNumItems);
   
 	// Free buffer items
 	list<Buffer::item>::iterator it;
@@ -57,15 +58,15 @@ void Buffer::allocate(unsigned int uNumItems, unsigned int uItemLength) {
 		if (item.pData !=NULL) {
 			m_empty.push_front(item);
 		} else {
-			printf("Failed to allocate buffer item %d\n", i);
+			printf("Buffer::Allocate -- Failed to allocate buffer item %d\n", i);
 		}
 	}	
 
   // Exercise the buffer to make sure delays from first time use don't occur
   // during operation
-  unsigned short* pTemp = (unsigned short*) malloc(m_uItemLength*sizeof(unsigned short));
+  SAMPLE_DATA_TYPE* pTemp = (SAMPLE_DATA_TYPE*) malloc(m_uItemLength*sizeof(SAMPLE_DATA_TYPE));
   if (pTemp) {
-    push(pTemp, m_uItemLength); 
+    push(pTemp, m_uItemLength, 1.0, 0.0); 
     free(pTemp); 
   }
 
@@ -271,7 +272,8 @@ void Buffer::cleanup() {
 // push
 // ----------------------------------------------------------------------------
 // Push a copy of the input data into the buffer
-bool Buffer::push(unsigned short* pIn, unsigned int uLength) {
+bool Buffer::push(SAMPLE_DATA_TYPE* pIn, unsigned int uLength, double dScale, 
+                  double dOffset) {
 
   Buffer::item item;
   bool bReturn = false;
@@ -292,9 +294,14 @@ bool Buffer::push(unsigned short* pIn, unsigned int uLength) {
       // in the buffer)
     	pthread_mutex_unlock(&m_mutex);
 
+      // Do the casting of the scale and offset ahead of time so it doesn't
+      // happen for every entry in the loop
+      BUFFER_DATA_TYPE scale = (BUFFER_DATA_TYPE) dScale;
+      BUFFER_DATA_TYPE offset = (BUFFER_DATA_TYPE) dOffset;
+      
       // Copy the incoming data into our buffer
       for (unsigned int i=0; i<uLength; i++) {
-        item.pData[i] = (((BUFFER_DATA_TYPE) pIn[i]) - 32768.0) / 32768.0;
+        item.pData[i] = ((BUFFER_DATA_TYPE) pIn[i]) * scale + offset;
       }
       
       // Make sure holds are cleared
@@ -380,9 +387,6 @@ void Buffer::clear() {
   }  
 
   m_pos = m_full.begin();
-  
-  //printf("Buffer: Maximum buffer used: %d of %d blocks (%.3g%%)\n", m_uMaxFullSize, m_uNumItems, 100.0*m_uMaxFullSize/m_uNumItems);
-  //m_uMaxFullSize = 0;
 
   pthread_mutex_unlock(&m_mutex);
 }
