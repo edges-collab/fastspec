@@ -5,7 +5,6 @@
 #include <px14.h>
 #include "digitizer.h"
 
-//#define pxboard_callback_fptr std::function<unsigned int(px14_sample_t*, unsigned int, unsigned long)>
 
 // ---------------------------------------------------------------------------
 //
@@ -14,6 +13,9 @@
 // Wrapper class that exposes basic functionality for a PX14000 digitizer
 // board.  The principal method to retrieve data is "acquire", which utilizes
 // a callback function set using "setCallback".
+//
+// Use:
+// #define SAMPLE_DATA_TYPE unsigned short
 //
 // ---------------------------------------------------------------------------
 class PXBoard : public Digitizer {
@@ -26,6 +28,7 @@ class PXBoard : public Digitizer {
     unsigned int                m_uVoltageRange1;
     unsigned int                m_uVoltageRange2;
     unsigned int                m_uSamplesPerTransfer;
+    unsigned long               m_uSamplesPerAccumulation;
     unsigned int                m_uBoardRevision;
     unsigned int                m_uSerialNumber;
     HPX14                       m_hBoard;
@@ -33,26 +36,27 @@ class PXBoard : public Digitizer {
     px14_sample_t*              m_pBuffer2;
     DigitizerReceiver*          m_pReceiver;
     bool                        m_bStop;
+    double                      m_dScale;
+    double                      m_dOffset;
 
+    bool setAcquisitionRate();
+    bool setInputChannel();
+    bool setVoltageRange();
+    bool setSamplesPerTransfer();
+    
   public:
 
     // Constructor and destructor
-    PXBoard();
+    PXBoard(double, unsigned long, unsigned int, unsigned int, unsigned int);
     ~PXBoard();
 
     // Setup functions    
     bool connect(unsigned int);
     void disconnect();
 
-    bool setAcquisitionRate(double);
-    bool setInputChannel(unsigned int);
-    bool setVoltageRange(unsigned int, unsigned int);
-    bool setTransferSamples(unsigned int);
-
+    // Interface
     void setCallback(DigitizerReceiver*);
-
-    // Main execution function
-    bool acquire(unsigned long);
+    bool acquire();
     void stop();
 
 };

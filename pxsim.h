@@ -71,6 +71,9 @@ double rand_normal(float mean, float stddev)
 // uniform random (**not gaussian**).  Mostly just for rough approximation.
 // Generating better random numbers was too slow.
 //
+// Use:
+// #define SAMPLE_DATA_TYPE unsigned short
+// 
 // ---------------------------------------------------------------------------
 class PXSim : public Digitizer {
 
@@ -82,27 +85,36 @@ class PXSim : public Digitizer {
     double                      m_dCWAmp1;              // 0 to 1 
     double                      m_dCWFreq2;             // MHz
     double                      m_dCWAmp2;              // 0 to 1 
-    double                      m_dNoiseAmp;            // 0 to 1   
+    double                      m_dNoiseAmp;            // 0 to 1  
+    unsigned long               m_uSamplesPerAccumulation; 
     unsigned int                m_uSamplesPerTransfer;
-    unsigned short*             m_pBuffer; 
+    SAMPLE_DATA_TYPE*           m_pBuffer; 
     DigitizerReceiver*          m_pReceiver;
     bool                        m_bStop;
+    double                      m_dScale;
+    double                      m_dOffset;
 
   public:
 
     // Constructor and destructor
-    PXSim() {
+    PXSim( double dAcquisitionRate, 
+           unsigned long uSamplesPerAccumulation, 
+           unsigned int uSamplesPerTransfer ) {
       m_bStop = false;
       m_dCWFreq1 = 0;
       m_dCWAmp1 = 0;
       m_dCWFreq2 = 0;
       m_dCWAmp2 = 0;   
       m_dNoiseAmp = 0;   
-      m_dAcquisitionRate = 0;     
-      m_uSamplesPerTransfer = 0;  
-      m_pBuffer = NULL;
-      m_pReceiver = NULL;
+      m_dAcquisitionRate = dAcquisitionRate;     // MS/s
+      m_uSamplesPerAccumulation = uSamplesPerAccumulation;
+      m_uSamplesPerTransfer = uSamplesPerTransfer;  
+      m_dScale = 1.0/32768;
+      m_dOffset = -1.0;
       printf("Using SIMULATED digitizer\n");
+      
+      m_pBuffer = (SAMPLE_DATA_TYPE*) malloc(m_uSamplesPerTransfer * sizeof(SAMPLE_DATA_TYPE));
+      m_pReceiver = NULL;
     }
 
     ~PXSim() { 
@@ -113,7 +125,7 @@ class PXSim : public Digitizer {
     }
   
 
-    bool acquire(unsigned long uNumSamplesToTransfer) {
+    bool acquire() {
 
       unsigned long uNumSamples = 0;
       Timer timer;
@@ -142,13 +154,13 @@ class PXSim : public Digitizer {
 
       // Loop over number of transfers requested
       unsigned long long uSampleIndex = 0;  
-      unsigned long uRandom;
-      unsigned short* pPointer;
+      unsigned long uRandom = 0;
+      unsigned short* pPointer = 0; // used to divide uRandom into 4 components
       double cw[4];
       double dCW1 = 2.0 * M_PI * m_dCWFreq1 / m_dAcquisitionRate;
       double dCW2 = 2.0 * M_PI * m_dCWFreq2 / m_dAcquisitionRate;
 
-      while ((uNumSamples < uNumSamplesToTransfer) && !m_bStop) {
+      while ((uNumSamples < m_uSamplesPerAccumulation) && !m_bStop) {
 
         // For each transfer, populate the buffer
         for (unsigned int i=0; i<m_uSamplesPerTransfer; i+=4) {
@@ -190,36 +202,28 @@ class PXSim : public Digitizer {
             usleep( (dTransferTime - timer.get()) * 1e6 );
         }
 
-        //printf("Toc: %8.6f, Transfer time: %8.6f, Diff: %8.6f\n", timer.get(), dTransferTime, (dTransferTime-timer.get())*1.0e6);
+        printf("Actual transfer time: %8.6f, Desired transfer time: %8.6f, Diff: %8.6f\n", timer.get(), dTransferTime, (dTransferTime-timer.get())*1.0e6);
 
 
         // Reset the timer
         timer.tic();
 
         // Call the callback function to process the chunk of data
-        uNumSamples += m_pReceiver->onDigitizerData(m_pBuffer, m_uSamplesPerTransfer, uNumSamples);
+        uNumSamples += m_pReceiver->onDigitizerData(m_pBuffer, m_uSamplesPerTransfer, uNumSamples, m_dScale, m_dOffset);
 
       } // transfer loop
 
       return true;
     }
 
-    bool connect(unsigned int) { return true; }
-
-    void disconnect() { }
-
-    bool setAcquisitionRate(double dRate ) { m_dAcquisitionRate = dRate; return true; }
-
-    bool setInputChannel(unsigned int) { return true; }
-
-    bool setVoltageRange(unsigned int, unsigned int) { return true; }
-
-    bool setTransferSamples(unsigned int uSamples) { 
-      m_uSamplesPerTransfer = uSamples;    
-      if (m_pBuffer) free(m_pBuffer);
-      m_pBuffer = (unsigned short*) malloc(m_uSamplesPerTransfer * sizeof(unsigned short));
+    bool connect(unsigned int) {      
+      
+      if (m_pBuffer == NULL) { return false;}
+      
       return true;
     }
+
+    void disconnect() { }
 
     void setSignal(double dFreq1, double dAmp1, double dFreq2, double dAmp2, double dNoiseAmp) { 
       m_dCWFreq1 = dFreq1; 

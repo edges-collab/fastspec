@@ -20,15 +20,20 @@
 // ----------------------------------------------------------------------------
 // Constructor
 // ----------------------------------------------------------------------------
-PXBoard::PXBoard()
+PXBoard::PXBoard( double dAcquisitionRate,
+                  unsigned long uSamplesPerAccumulation,
+                  unsigned int uSamplesPerTransfer,
+                  unsigned int uInputChannel,
+                  unsigned int uVoltageRange )
 {
 
   // Pre-populate the user specifiable setup parameters
-  m_dAcquisitionRate = 0;     // MS/s
-  m_uVoltageRange1 = 0;
-  m_uVoltageRange2 = 0;
-  m_uInputChannel = 0;        // 0 = dual, 1= input1, 2=input2
-  m_uSamplesPerTransfer = 0;     // 2^20 samples known to work well
+  m_dAcquisitionRate = dAcquisitionRate;        // MS/s
+  m_uSamplesPerAccumulation = uSamplesPerAccumulation;
+  m_uSamplesPerTransfer = uSamplesPerTransfer;  // 2^20 known to work well
+  m_uInputChannel = uInputChannel;              // 0 = dual, 1= input1, 2=input2
+  m_uVoltageRange1 = uVoltageRange;
+  m_uVoltageRange2 = uVoltageRange;
 
   // To be retrieved from board
   m_uSerialNumber = -1;
@@ -39,6 +44,8 @@ PXBoard::PXBoard()
   m_pBuffer1 = NULL;
   m_pBuffer2 = NULL;
   m_pReceiver = NULL;
+  m_dScale = 0;
+  m_dOffset = 0;
 
   m_bStop = false;
 }
@@ -92,12 +99,24 @@ bool PXBoard::connect(unsigned int uBoardNumber)
   }
 
   // Apply board settings
-  if (!setVoltageRange(1, m_uVoltageRange1)) { return false; }
-  if (!setVoltageRange(2, m_uVoltageRange2)) { return false; }
-  if (!setInputChannel(m_uInputChannel)) { return false; }
-  if (!setAcquisitionRate(m_dAcquisitionRate)) { return false; }
-  if (!setTransferSamples(m_uSamplesPerTransfer)) { return false; }
+  if (!setVoltageRange()) { return false; }
+  if (!setInputChannel()) { return false; }
+  if (!setAcquisitionRate()) { return false; }
+  if (!setSamplesPerTransfer()) { return false; }
 
+  // Calculate the scale and offset used outside the digitizer class to convert 
+  // from samples to voltages based on: voltage = scale*sample + offset.  
+  //
+  // PX14400 defines the voltage as:
+  // voltage = ((sample - 32768) / 32768
+  // 
+  // Our scale is:  scale = 1/32768
+  // Our offset is: offset = -1
+  // 
+  // TBD: need to make sure this based on selected voltage range
+  m_dScale = 1.0 / 32768;
+  m_dOffset = -1.0;
+  
   return true;
 
 } // connect()
@@ -135,9 +154,9 @@ void PXBoard::disconnect()
 
 
 // ----------------------------------------------------------------------------
-// setTransferSamples 
+// setSamplesPerTransfer 
 // ----------------------------------------------------------------------------
-bool PXBoard::setTransferSamples(unsigned int uSamplesPerTransfer) 
+bool PXBoard::setSamplesPerTransfer() 
 {
   // Allocate a DMA buffer that will receive PCI acquisition data. By
   // allocating a DMA buffer, we can use the "fast" PX14400 library
@@ -148,8 +167,6 @@ bool PXBoard::setTransferSamples(unsigned int uSamplesPerTransfer)
 
   int res;
 
-  // Remember the setting
-  m_uSamplesPerTransfer = uSamplesPerTransfer;
 
   // Apply the settings (if connected to board)
   if (m_hBoard) {
@@ -181,19 +198,16 @@ bool PXBoard::setTransferSamples(unsigned int uSamplesPerTransfer)
 
   return true;
 
-} // setTransferSamples()
+} // setSamplesPerTransfer()
 
 
 
 // ----------------------------------------------------------------------------
 // setAcquisitionRate - Acquisition rate in MS/s
 // ----------------------------------------------------------------------------
-bool PXBoard::setAcquisitionRate(double dAcquisitionRate) 
+bool PXBoard::setAcquisitionRate() 
 {
   int res;
-
-  // Remember the setting
-  m_dAcquisitionRate = dAcquisitionRate;
 
   // Apply the setting (if connected to board)
   if (m_hBoard) {
@@ -213,7 +227,7 @@ bool PXBoard::setAcquisitionRate(double dAcquisitionRate)
 // ----------------------------------------------------------------------------
 // setInputChannel
 // ----------------------------------------------------------------------------
-bool PXBoard::setInputChannel(unsigned int uChannel) 
+bool PXBoard::setInputChannel() 
 {
   int res;
   unsigned int uTriggerSource;
@@ -223,12 +237,9 @@ bool PXBoard::setInputChannel(unsigned int uChannel)
   // 0 = dual (both channels)
   // 1 = Input 1
   // 2 = Input 2
-  if (uChannel < 0 || uChannel > 2) {
+  if (m_uInputChannel < 0 || m_uInputChannel > 2) {
     return false;
   }
-
-  // Remember the setting
-  m_uInputChannel = uChannel;
 
   // Apply the setting (if connected to board)
   if (m_hBoard) {
@@ -264,40 +275,25 @@ bool PXBoard::setInputChannel(unsigned int uChannel)
 // ----------------------------------------------------------------------------
 // setVoltageRange
 // ----------------------------------------------------------------------------
-bool PXBoard::setVoltageRange(unsigned int uChannel, unsigned int uRange) 
+bool PXBoard::setVoltageRange() 
 {
   int res;
 
-  if (uChannel == 1) {
-
-    // Remember the setting
-    m_uVoltageRange1 = uRange;
-
-    // Apply the setting (if connected to board)
-    if (m_hBoard) {
-      if ((res=SetInputVoltRangeCh1PX14(m_hBoard, m_uVoltageRange1)) != SIG_SUCCESS) { 
-        DumpLibErrorPX14(res, "Failed to set voltage range: ", m_hBoard);
-        return false;
-      }
+  // Apply the setting (if connected to board)
+  if (m_hBoard) {
+    if ((res=SetInputVoltRangeCh1PX14(m_hBoard, m_uVoltageRange1)) != SIG_SUCCESS) { 
+      DumpLibErrorPX14(res, "Failed to set voltage range: ", m_hBoard);
+      return false;
     }
 
-  } else if (uChannel == 2) {
-
-    // Remember the setting   
-    m_uVoltageRange2 = uRange;
-
-    // Apply the setting (if connected to board)
-    if (m_hBoard) {
-      if ((res=SetInputVoltRangeCh2PX14(m_hBoard, m_uVoltageRange2)) != SIG_SUCCESS) { 
-        DumpLibErrorPX14(res, "Failed to set voltage range: ", m_hBoard);
-        return false;
-      }
+    if ((res=SetInputVoltRangeCh2PX14(m_hBoard, m_uVoltageRange2)) != SIG_SUCCESS) { 
+      DumpLibErrorPX14(res, "Failed to set voltage range: ", m_hBoard);
+      return false;
     }
-
   } else {
     return false;
   }
-
+ 
   return true;
 
 } // setVoltageRange()
@@ -307,15 +303,15 @@ bool PXBoard::setVoltageRange(unsigned int uChannel, unsigned int uRange)
 // ----------------------------------------------------------------------------
 // acquire() - Transfer data from the board 
 //
-//         Set uNumSamplesToTransfer = 0 for infinte loop.  Otherwise, 
+//         Set m_uSamplesPerAccumulation = 0 for infinte loop.  Otherwise, 
 //         transfers are are acquired and sent to the callback.  The callback 
 //         should return the number of samples handled successfully.  This  
-//         function will continue to deliver sample to the callback until the 
-//         sum of all callbacks responses reaches uNumSamplestoTransfer. Te loop 
-//         can be aborted by calling stop().
+//         function will continue to deliver samples to the callback until the 
+//         sum of all callbacks responses reach m_uSamplesPerAccumulation. 
+//         The loop can be aborted by calling stop().
 //
 // ----------------------------------------------------------------------------
-bool PXBoard::acquire(unsigned long uNumSamplesToTransfer)
+bool PXBoard::acquire()
 {
   px14_sample_t *pCurrentBuffer = NULL;
   px14_sample_t *pPreviousBuffer = NULL;
@@ -356,7 +352,7 @@ bool PXBoard::acquire(unsigned long uNumSamplesToTransfer)
   // fresh acquisition data to one half, we process the other half.
 
   // Loop over number of transfers requested
-  while ((uNumSamples < uNumSamplesToTransfer) && !m_bStop) {
+  while ((uNumSamples < m_uSamplesPerAccumulation) && !m_bStop) {
 
     // Determine where new data transfer data will go. We alternate
     // between our two DMA buffers
@@ -370,7 +366,8 @@ bool PXBoard::acquire(unsigned long uNumSamplesToTransfer)
     // the transfer and returns without waiting for it to finish. This
     // gives us a chance to process the last batch of data in parallel
     // with this transfer.
-    if ((res=GetPciAcquisitionDataFastPX14(m_hBoard, m_uSamplesPerTransfer, pCurrentBuffer, PX14_TRUE)) != SIG_SUCCESS) {
+    if ((res=GetPciAcquisitionDataFastPX14(m_hBoard, m_uSamplesPerTransfer, 
+          pCurrentBuffer, PX14_TRUE)) != SIG_SUCCESS) {
       DumpLibErrorPX14 (res, "\nPXBoard::run() - Failed to obtain acquisition data: ", m_hBoard);
       EndBufferedPciAcquisitionPX14(m_hBoard);
       return false;
@@ -380,7 +377,8 @@ bool PXBoard::acquire(unsigned long uNumSamplesToTransfer)
     // transfering the current.
     if (pPreviousBuffer) {
       if (m_pReceiver) {
-        uNumSamples += m_pReceiver->onDigitizerData((unsigned short*) pPreviousBuffer, m_uSamplesPerTransfer, uNumSamples);
+        uNumSamples += m_pReceiver->onDigitizerData( (SAMPLE_DATA_TYPE*) pPreviousBuffer, 
+          m_uSamplesPerTransfer, uNumSamples, m_dScale, m_dOffset);
       } else {
         uNumSamples += m_uSamplesPerTransfer;
       }
@@ -415,10 +413,6 @@ bool PXBoard::acquire(unsigned long uNumSamplesToTransfer)
 
   } // transfer loop
 
-  // Process last acquisition of loop
-  //if (pPreviousBuffer) {
-  //  onTransfer(pPreviousBuffer, m_uSamplesPerTransfer);
-  //}
 
   // Stop acquisition 
   EndBufferedPciAcquisitionPX14(m_hBoard);
