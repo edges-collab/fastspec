@@ -4,7 +4,7 @@
 #include <functional>
 #include "digitizer.h"
 
-#include <CsTypes.h>
+#include "CsPrototypes.h"
 
 // ---------------------------------------------------------------------------
 //

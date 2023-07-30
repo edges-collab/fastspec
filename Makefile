@@ -21,11 +21,16 @@ else ifeq ($(digitizer), razormax)
 	DIG_SRCS := razormax.cpp
 	DIG_HDRS := razormax.h
 	DIG_LIBS := -lCsSsm -lCsAppSupport 
-	DIG_DEFS := -DDIG_RAZORMAX	 -DSAMPLE_DATA_TYPE="short"
-	DIG_INCS := \
-	  -I/home/jdbowman/gati-linux-driver/Sdk/CsAppSupport \
-	  -I/home/jdbowman/gati-linux-driver/Sdk/C_Common \
-	  -I/home/jdbowman/gati-linux-driver/Include/Public
+	DIG_DEFS := -DDIG_RAZORMAX -DSAMPLE_DATA_TYPE="short"
+	DIG_INCS := -I/usr/local/include/gage
+# The Gage driver SDK includes are in three folders.  FASTSPEC only needs the
+# ones in Include/Public and assumes these have been copied to:
+# /usr/local/include/gage/
+#
+#  -I../gati-linux-driver/Sdk/CsAppSupport \
+#  -I../gati-linux-driver/Sdk/C_Common \
+#	 -I../gati-linux-driver/Include/Public
+	 
 else
 	# Cause an abort before building
 	ERROR_DIG := true
@@ -106,7 +111,7 @@ endif
 ifdef ERROR_SWITCH
 	# Abort with error message
 	$(error No switch method specified on make command line. Use make argument: \
-	  switch=[mezio, parallel, sim])
+	  switch=[mezio, parallelport, sim])
 endif
 
 ifdef USE_DEFAULT_PRECISION

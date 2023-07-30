@@ -1,31 +1,16 @@
-#include <stdio.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <string.h>
-#include <time.h>
-#include <sched.h>
-#include <math.h>
-#include <sys/io.h>
-#include <fcntl.h>
-#include <pthread.h>
-#include <errno.h>
-#include <signal.h>
-#include <ctype.h>
-
 #include "razormax.h"
+//#include "CsSdkMisc.h" // DisplayErrorString
+//#include "CsExpert.h" // USER_MODE
 
 
 
-#include <sys/stat.h>
-
-#include <CsAppSupport.h>
-#include "CsTchar.h"
-#include "CsSdkMisc.h"
-#include "CsSdkUtil.h"
-#include "CsExpert.h"
-#include <CsPrototypes.h>
-
+// Implement here so we don't have to #include CsSdkMisc.h
+void DisplayErrorString(const int32 i32Status)
+{
+	char	szErrorString[255];
+	CsGetErrorString(i32Status, szErrorString, 255);
+	printf("\n%s\n", szErrorString);
+}
 
 
 
@@ -152,6 +137,8 @@ bool RazorMax::connect(unsigned int uBoardNumber)
   // mode).  See ACQUISITION_MODES in CsDefines.h
   csAcquisitionCfg.u32Mode = CS_MODE_SINGLE;  
 
+  /*
+  // (must #include CsExpert.h)
   // Check if selected system supports Expert Stream and set the correct 
   // firmware image to be used.
   int64 i64ExtendedOptions = 0;
@@ -180,6 +167,7 @@ bool RazorMax::connect(unsigned int uBoardNumber)
     disconnect();
     return false;
   }
+  */
 
   // Set the acquisition rate
   csAcquisitionCfg.i64SampleRate = m_uAcquisitionRate;
@@ -466,12 +454,15 @@ bool RazorMax::acquire()
       return false;
     }
 
+    /*
+    // (must #include CsExpert.h)
     if ( STM_TRANSFER_ERROR_FIFOFULL & u32ErrorFlag )
     {
       printf("\n *** FIFO Full Error ***\n");
       CsDo(m_hBoard, ACTION_ABORT);
       return false;
     }
+    */
 
     // Switch buffers
     pPreviousBuffer = pCurrentBuffer;

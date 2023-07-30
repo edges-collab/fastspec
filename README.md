@@ -10,27 +10,54 @@ FASTPEC is a spectrometer for the EDGES instrument.  It controls the receiver sw
 ### Dependencies
 Prior to building, ensure the following dependencies are installed on the system:
 
-* `fftw3f-dev` (for single precision versions)
-* `fftw3-dev` (for double-precision versions) 
-* `sig_px14400` (not needed for simulator version)
-* `wdt_dio` (for Mezio version)
+* `fftw3f-dev` - Only needed for Ubuntu 18.04 LTS or lower.  Provides single precision FFT.
+* `fftw3-dev` - Provides double-precision FFT.  For Ubuntu 20.04 LTS and later it also provides single precision FFT.
+* `sig_px14400` - Only needed for digitizer=pxboard.  Must be compiled from driver source code.  The last supported version of the driver includes Ubuntu 18.04 LTS.  
+* `CsE16bcd` - Only needed for digitizer=raxormax.  Must compile from driver source code.  The current supported version (as of July 2023) includes Ubuntu 20.04 LTS.  See additional installation notes below.
+* `wdt_dio` - Only needed for switch=mezio.  Provides interface to the MezIO system.
+* `gnuplot-qt` - (Optional) Provides GUI for displaying live spectra plots.
 
-### Compilation
-Compile FASTSPEC by entering the `fastspec/` directory and using `make` to compile the executable.  FASTSPEC can be compiled in several ways:
+### Supported Digitizer Boards
+* `PX14400` - use make flag: digitizer=pxboard
+* `RazorMax` - use make flag: digitizer=razormax
 
-* `make single` - uses single floating point precision in the FFT and controls the receiver switch through a parallel port              
-* `make double` - uses double floating point precision in the FFT and controls the receiver switch through a parallel port            
-* `make mezio` - uses single point precision in the FFT and controls the receiver through a MezIO interface.
-* `make simulate` - generates a mock digitizer data stream and processes it identically to the `single` configuration above. A simulated receiver switch is used so no physical hardware is controlled.
-          
-Use `sudo make [target]` when building to allow installing the resulting executable in `/usr/local/bin`. It will also ensure the s-bit is set for versions that need access to the parallel port.
+### Build Configuration and Process
+After installing the dependencies, build FASTSPEC by entering the `fastspec/` directory and using `make` to compile the executable.  FASTSPEC is configured using `make` flags following the form:
+```
+$ make digitizer=<flag> switch=<flag> precision=<flag>
+```
+Supported digitizer flags are:
+
+* `pxboard` - Requires the `sig_px14400` driver and px14.h header file to be installed (see EDGES Google Shared Drive for final driver source code)
+* `pxsim` - No required drivers.  Gnerates a mock digitizer data stream.  No physical digitizer is used.  Helpful for testing other aspects of the code. (very slow)
+* `razormax` - Requires the Gage Linux SDK/dirver and associated header files to be installed (see EDGES Google Shared driver for latest driver source code)
+
+Supported switch flags are:
+
+* `mezio` - Requires `wdt_dio` to be installed and uses the MezIO system.
+* `parallelport` - Uses the parallel port.
+* `sim` - Dummy switch that has no effect on any hardware.  Helpful for testing other aspects of the code.
+
+Fastspec supports two build-time floating precision options for the FFT used in the polyphase filter bank: single (32 bit) and double (64 bit).  These can be set with precision flags:
+
+* `single` - Default option if no precision flag is set
+* `double` - Double precision FFT significantly slows execution (requires more threads).
+
+The `make` process will ask for `sudo` privileges at the end of the build to set the s-bit on the final executable (not sure if this needed for all build/execution cases, but it is included for all).
+
+The name of the output exectuable is based on the flags provided to `make` and follows the form:  fastspec_[digitizer]_[switch]_[precision]
+
+To install the output excutable to /usr/local/bin after building, use the `install` target on the `make` command line, e.g.:
+```$ make install digitizer=razormax switch=parallelport```
+
+To clean the build directory and remove all fastspec executables from /usr/local/bin, use: `make clean`
 
 ## Usage
 
 Run FASTSPEC by calling the appropriate executable, e.g.:
 
 ```
-$ fastspec_single
+$ fastspec_pxboard_mezio_single
 ```
 
 ### Runtime Configuration
@@ -56,10 +83,10 @@ Each heading (e.g. 'Spectrometer') provides the `.ini` section under which the o
 
 #### Spectrometer
 * `-f --output_file`: 
-* `-o --switch_io_port`: 0x3010
+* `-o --switch_io_port`: 0x3010 [only used for parallelport switch]
 * `-e --switch_delay`: 0.5
-* `-l --input_channel`: 1 
-* `-v --voltage_range`: 0 
+* `-l --input_channel`: 1 [only used pxboard digtizer]
+* `-v --voltage_range`: 0 [only used pxboard digtizer]
 * `-a --samples_per_accumulation`: 2147483648 
 * `-t --samples_per_transfer`: 2097152
 * `-r --acquisition_rate`: 400 
@@ -81,7 +108,7 @@ Each heading (e.g. 'Spectrometer') provides the `.ini` section under which the o
 
 Some key parameters are:
 
-* `-f`: Specify an output file.  Overwrites any existing file at the specified path.  If no output file is specified on the command line or in a .ini file, FASTSPEC automatically determines output file paths from the datadir, site, and instrument parameters along with the time in UTC when spectra from each switch cycle are written.      
+* `-f`: Specify an output file.  Overwrites any existing file at the specified path.  If no output file is specified on the command line or in a .ini file, FASTSPEC automatically determines output file paths from the datadir, site, and instrument parameters along with the time in UTC when spectra from each switch cycle are written.
 * `-h`: View this help message.
 * `-i`: Specify the `.ini` configuration file.  If not specified, the default configuration file is tried (usually ./fastspec.ini)
 
@@ -99,8 +126,47 @@ FASTSPEC can also be called to control the behavior of an already running instan
 FASTSPEC uses gnuplot for plotting (`-p`, `--show_plots`).  Gnuplot can be installed using the system package manager, e.g.:
 
 ```
-sudo apt-get install gnuplot
+$ sudo apt install gnuplot
 ```
-
 In addition to the built-in gnuplot commands, such as '+' and '-' to scale the plot, right clicking corners of a box to zoom, exporting to image files, etc. (see http://www.gnuplot.info/ for more information), the FASTSPEC plot can be toggled between a plot showing the three raw switch position spectra and a plot showing the'corrected' (uncalibrated) antenna temperature by pressing 'x' in the plot window.
+
+### RazorMax (Gage SDK and Driver) Installation Notes and Tips
+
+Note: The RazorMax board needs to have the eXpert Data Streaming firmware option loaded (extra purchase when buying the board).  To install the streaming firmware, you will probably need to insert the board in a Window machine and run the CompuScope Manager utility.  Follow the instructions in the manual.
+
+To install the driver for the RazorMax digitizer on Ubuntu 20.04 LTS, follow these steps:
+
+1. Download CS_Linux_5.04.40.zip from the EDGES Google Shared Drive folder: "EDGES/Project Engineering/2. Digitizers/Gage_RazorMax" and unpack.
+2. cd into gati-linux-driver folder
+3. Make sure .sh files are executable
+4. For systems using Secure Boot (e.g. dual-boot computers with Windows), you will need to sign the kernel module with a certificate recognized by the trusted platform module.  
+- Check if /var/lib/shim-signed/mok contains the files: MOK.priv and MOK.der.  If so you likely have a certificate that is already registered that you can use to sign the kernel module.  If you do not have the MOK files or if the driver build ultimately reports an error that the kernel module can be loaded, then you will need to make a new certificate/key and enroll it.  Do this by entering:
+  ```$ sudo update-secureboot-policy new-key```
+  You will be prompted to enter a temporary password that you will need to use after rebooting the system to enroll the certificate.  After creating the key, reboot the computer.  The BIOS should halt the reboot and ask if you want to enroll the new key.  Follow the instructions to do so and then resume the boot.
+- If you have existing MOK files, but the build ultimately reports an error that the kernel module can be loaded, you may have to add the existing certificate/key to the Ubuntu manager:
+  ```$ sudo mokutil --import /var/lib/shim-signed/mok/MOK.der```
+- After getting your certificate/key registered, open the Gage driver file: ./Boards/KernelSpace/CsHexagon/Linux/Makefile and add the following line to the top of the install target section:
+  ```$ @sudo kmodsign sha512 /var/lib/shim-signed/mok/MOK.priv /var/lib/shim-signed/mok/MOK.der $(TARGET)```
+  Note: if you want to try this manually for debugging, the $(TARGET) = CsE16bcd.ko
+5. Run the gage install script:
+  ```$ ./gagesc install -c hexagon -ad```
+  Note:  During installation, modprobe will report failure if the Razormax card isn't installed in the computer.  It will only load the module if the card is present.
+6. After build succeeds, copy the public include files to /usr/local/include/gage so fastspec can easily find them
+  ```$ sudo mkdir /usr/local/include/gage```
+  ```$ sudo cp ./Include/Public/*.h /usr/local/include/gage/```
+  ```$ sudo chmod a-x /usr/local/include/gage*.h```
+7. You can also build the CsTest application (although it has limit value). First you will likely need to `$ sudo apt install qt5-default`. Then:
+  ```$ cd CsTestQt```
+  ```$ chmod a+x install_cstestqt.sh```
+  ```$ ./install_cstestqt.sh```
+8. You can also use the CompuScope SDK applications, particularly ./Sdk/Advanced/GageStream2Disk to test that your RazorMax board is communicating properly.
+9. You can also use the /usr/local/bin/gagehp.sh script to check if the driver is loaded: `$ gagehp.sh -i`.
+
+
+
+
+
+
+
+
 
