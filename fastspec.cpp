@@ -234,21 +234,25 @@ int main(int argc, char* argv[])
     // -----------------------------------------------------------------------       
        
     #if defined DIG_RAZORMAX
-      RazorMax dig(dAcquisitionRate, uSamplesPerAccum, uSamplesPerTransfer); 
+      RazorMax dig( dAcquisitionRate, 
+                    uSamplesPerAccum, 
+                    uSamplesPerTransfer ); 
     #elif defined DIG_PXBOARD
-      PXBoard dig;
-      dig.setAcquisitionRate(dAcquisitionRate); 
-      dig.setTransferSamples(uSamplesPerTransfer); 
-      dig.setInputChannel(uInputChannel);
-      dig.setVoltageRange(uInputChannel, uVoltageRange);
+      PXBoard dig( dAcquisitionRate, 
+                   uSamplesPerAccum, 
+                   uSamplesPerTransfer, 
+                   uInputChannel, 
+                   uVoltageRange );
     #elif defined DIG_PXSIM
-      PXSim dig;
+      PXSim dig( dAcquisitionRate, 
+                 uSamplesPerAccum, 
+                 uSamplesPerTransfer );
       dig.setSignal(dCWFreq1, dCWAmp1, dCWFreq2, dCWAmp2, dNoiseAmp);
     #endif
 
     // Connect to the digitizer board
     if (!dig.connect(1)) { 
-      printf("Failed to connect to PX board. Abort. \n");
+      printf("Failed to connect to digitizer board. Abort. \n");
       return 1;
     }
 
