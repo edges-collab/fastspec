@@ -38,14 +38,14 @@ Supported switch flags are:
 * `parallelport` - Uses the parallel port.
 * `sim` - Dummy switch that has no effect on any hardware.  Helpful for testing other aspects of the code.
 
-Fastspec supports two build-time floating precision options for the FFT used in the polyphase filter bank: single (32 bit) and double (64 bit).  These can be set with precision flags:
+Fastspec supports two build-time floating point precision options for the FFT used in the polyphase filter bank: single (32 bit) and double (64 bit).  These can be set with precision flags:
 
 * `single` - Default option if no precision flag is set
 * `double` - Double precision FFT significantly slows execution (requires more threads).
 
 The `make` process will ask for `sudo` privileges at the end of the build to set the s-bit on the final executable (not sure if this needed for all build/execution cases, but it is included for all).
 
-The name of the output exectuable is based on the flags provided to `make` and follows the form:  fastspec_[digitizer]_[switch]_[precision]
+The name of the output exectuable is based on the flags provided to `make` and follows the form:  fastspec_[digitizer]_[switch]__[precision]
 
 To install the output excutable to /usr/local/bin after building, use the `install` target on the `make` command line, e.g.:
 ```$ make install digitizer=razormax switch=parallelport```
@@ -132,7 +132,7 @@ In addition to the built-in gnuplot commands, such as '+' and '-' to scale the p
 
 ### RazorMax (Gage SDK and Driver) Installation Notes and Tips
 
-Note: The RazorMax board needs to have the eXpert Data Streaming firmware option loaded (extra purchase when buying the board).  To install the streaming firmware, you will probably need to insert the board in a Window machine and run the CompuScope Manager utility.  Follow the instructions in the manual.
+Note: The RazorMax board needs to have the eXpert Data Streaming firmware option loaded (extra purchase when buying the board).  To install the streaming firmware, you will probably need to insert the board in a Windows machine and run the CompuScope Manager utility.  Follow the instructions in the manual.
 
 To install the driver for the RazorMax digitizer on Ubuntu 20.04 LTS, follow these steps:
 
@@ -141,24 +141,36 @@ To install the driver for the RazorMax digitizer on Ubuntu 20.04 LTS, follow the
 3. Make sure .sh files are executable
 4. For systems using Secure Boot (e.g. dual-boot computers with Windows), you will need to sign the kernel module with a certificate recognized by the trusted platform module.  
 - Check if /var/lib/shim-signed/mok contains the files: MOK.priv and MOK.der.  If so you likely have a certificate that is already registered that you can use to sign the kernel module.  If you do not have the MOK files or if the driver build ultimately reports an error that the kernel module can be loaded, then you will need to make a new certificate/key and enroll it.  Do this by entering:
-  ```$ sudo update-secureboot-policy new-key```
+  ```
+  $ sudo update-secureboot-policy new-key
+  ```
   You will be prompted to enter a temporary password that you will need to use after rebooting the system to enroll the certificate.  After creating the key, reboot the computer.  The BIOS should halt the reboot and ask if you want to enroll the new key.  Follow the instructions to do so and then resume the boot.
 - If you have existing MOK files, but the build ultimately reports an error that the kernel module can be loaded, you may have to add the existing certificate/key to the Ubuntu manager:
-  ```$ sudo mokutil --import /var/lib/shim-signed/mok/MOK.der```
-- After getting your certificate/key registered, open the Gage driver file: ./Boards/KernelSpace/CsHexagon/Linux/Makefile and add the following line to the top of the install target section:
-  ```$ @sudo kmodsign sha512 /var/lib/shim-signed/mok/MOK.priv /var/lib/shim-signed/mok/MOK.der $(TARGET)```
+  ```
+  $ sudo mokutil --import /var/lib/shim-signed/mok/MOK.der
+  ```
+- After getting your certificate/key registered, open the Gage driver file: ./Boards/KernelSpace/CsHexagon/Linux/Makefile and add the following line to the top of the "install" target section:
+  ```
+  @sudo kmodsign sha512 /var/lib/shim-signed/mok/MOK.priv /var/lib/shim-signed/mok/MOK.der $(TARGET)
+  ```
   Note: if you want to try this manually for debugging, the $(TARGET) = CsE16bcd.ko
 5. Run the gage install script:
-  ```$ ./gagesc install -c hexagon -ad```
+  ```
+  $ ./gagesc install -c hexagon -ad
+  ```
   Note:  During installation, modprobe will report failure if the Razormax card isn't installed in the computer.  It will only load the module if the card is present.
 6. After build succeeds, copy the public include files to /usr/local/include/gage so fastspec can easily find them
-  ```$ sudo mkdir /usr/local/include/gage```
-  ```$ sudo cp ./Include/Public/*.h /usr/local/include/gage/```
-  ```$ sudo chmod a-x /usr/local/include/gage*.h```
-7. You can also build the CsTest application (although it has limit value). First you will likely need to `$ sudo apt install qt5-default`. Then:
-  ```$ cd CsTestQt```
-  ```$ chmod a+x install_cstestqt.sh```
-  ```$ ./install_cstestqt.sh```
+  ```
+  $ sudo mkdir /usr/local/include/gage
+  $ sudo cp ./Include/Public/*.h /usr/local/include/gage/
+  $ sudo chmod a-x /usr/local/include/gage/*.h
+  ```
+7. You can also build the CsTestQt application (although it has limited utility). First you will likely need to `$ sudo apt install qt5-default`. Then:
+  ```
+  $ cd CsTestQt
+  $ chmod a+x install_cstestqt.sh
+  $ ./install_cstestqt.sh
+  ```
 8. You can also use the CompuScope SDK applications, particularly ./Sdk/Advanced/GageStream2Disk to test that your RazorMax board is communicating properly.
 9. You can also use the /usr/local/bin/gagehp.sh script to check if the driver is loaded: `$ gagehp.sh -i`.
 
