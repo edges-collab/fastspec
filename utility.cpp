@@ -55,6 +55,21 @@ string get_path(const string& sFilePath)
 
 
 // ----------------------------------------------------------------------------
+// get_filepath_without_extension
+// ----------------------------------------------------------------------------
+string get_filepath_without_extension(const string& sFilePath)
+{
+  size_t iPos = sFilePath.find_last_of(".");
+  if (iPos == string::npos) {
+    return sFilePath;
+  } 
+
+  return sFilePath.substr(0, iPos);
+}
+
+
+
+// ----------------------------------------------------------------------------
 // make_path -- Recursive function to create full path provided
 //
 // Adapted from code posted to stackoverflow.com

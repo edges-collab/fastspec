@@ -45,6 +45,8 @@ bool make_path( const std::string&, mode_t);
 
 std::string get_path( const std::string& );
 
+std::string get_filepath_without_extension(const std::string& );
+
 std::string construct_filepath_name(const std::string&, 
                                     const std::string&, 
                                     const std::string&, 

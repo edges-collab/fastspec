@@ -28,6 +28,7 @@
 
 
 #include "pfb.h"
+#include "dumper.h"
 #include "spectrometer.h"
 #include "switch.h"
 #include "utility.h"
@@ -133,6 +134,8 @@ int main(int argc, char* argv[])
     iCtrlMode = ctrl.getOptionBool("[ARGS]", "show", "show", false) ? CTRL_MODE_SHOW : iCtrlMode;
     iCtrlMode = ctrl.getOptionBool("[ARGS]", "hide", "hide", false) ? CTRL_MODE_HIDE : iCtrlMode;
     iCtrlMode = ctrl.getOptionBool("[ARGS]", "kill", "kill", false) ? CTRL_MODE_KILL : iCtrlMode;
+    iCtrlMode = ctrl.getOptionBool("[ARGS]", "dump", "dump", false) ? CTRL_MODE_DUMP_START : iCtrlMode;
+    iCtrlMode = ctrl.getOptionBool("[ARGS]", "nodump", "nodump", false) ? CTRL_MODE_DUMP_STOP : iCtrlMode;
     iCtrlMode = ctrl.getOptionBool("[ARGS]", "help", "-h", false) ? CTRL_MODE_HELP : iCtrlMode;
 
     // Set the controller's mode based on the above options.  If the
@@ -156,33 +159,45 @@ int main(int argc, char* argv[])
     string sSite              = ctrl.getOptionStr("Installation", "site", "-z", "");
     string sInstrument        = ctrl.getOptionStr("Installation", "instrument", "-j", "");
     string sOutput            = ctrl.getOptionStr("Spectrometer", "output_file", "-f", "");
+    
+    // Switch configuration
     long uSwitchIOPort        = ctrl.getOptionInt("Spectrometer", "switch_io_port", "-o", 0x3010);
     double dSwitchDelay       = ctrl.getOptionReal("Spectrometer", "switch_delay", "-e", 0.5);
+    
+    // Digitizer configuration
     long uSamplesPerAccum     = ctrl.getOptionInt("Spectrometer", "samples_per_accumulation", "-a", 1024L*2L*1024L*1024L);
     long uSamplesPerTransfer  = ctrl.getOptionInt("Spectrometer", "samples_per_transfer", "-t", 2*1024*1024);
     double dAcquisitionRate   = ctrl.getOptionInt("Spectrometer", "acquisition_rate", "-r", 400);
-    #ifdef DIG_PXBOARD    
+    
+    #if defined DIG_PXBOARD    
       long uInputChannel        = ctrl.getOptionInt("Spectrometer", "input_channel", "-l", 2);
       long uVoltageRange        = ctrl.getOptionInt("Spectrometer", "voltage_range", "-v", 0);
-    #endif
-    long uNumChannels         = ctrl.getOptionInt("Spectrometer", "num_channels", "-n", 65536);
-    long uNumTaps             = ctrl.getOptionInt("Spectrometer", "num_taps", "-q", 5);
-    long uWindowFunctionId    = ctrl.getOptionInt("Spectrometer", "window_function_id", "-w", 1);
-    long uNumThreads          = ctrl.getOptionInt("Spectrometer", "num_fft_threads", "-m", 4);
-    long uNumBuffers          = ctrl.getOptionInt("Spectrometer", "num_fft_buffers", "-b", 400);
-    long uStopCycles          = ctrl.getOptionInt("Spectrometer", "stop_cycles", "-c", 0); 
-    double dStopSeconds       = ctrl.getOptionReal("Spectrometer", "stop_seconds", "-s", 0);
-    string sStopTime          = ctrl.getOptionStr("Spectrometer", "stop_time", "-u", "");
-    bool bPlot                = ctrl.getOptionBool("Spectrometer", "show_plots", "-p", false);    
-    long uPlotBin             = ctrl.getOptionInt("Spectrometer", "plot_bin", "-B", 1);  
-
-    #ifdef DIG_PXSIM
+    #elif defined DIG_PXSIM
       double dCWFreq1         = ctrl.getOptionReal("Spectrometer", "sim_cw_freq1", "-F1", 75);
       double dCWAmp1          = ctrl.getOptionReal("Spectrometer", "sim_cw_amp1", "-A1", 0.3);
       double dCWFreq2         = ctrl.getOptionReal("Spectrometer", "sim_cw_freq2", "-F2", 40);
       double dCWAmp2          = ctrl.getOptionReal("Spectrometer", "sim_cw_amp2", "-A2", 0.2);  
       double dNoiseAmp        = ctrl.getOptionReal("Spectrometer", "sim_noise_amp", "-AN", 0.1);
     #endif
+    
+    // Channelizer configuration
+    long uNumChannels         = ctrl.getOptionInt("Spectrometer", "num_channels", "-n", 65536);
+    long uNumTaps             = ctrl.getOptionInt("Spectrometer", "num_taps", "-q", 5);
+    long uWindowFunctionId    = ctrl.getOptionInt("Spectrometer", "window_function_id", "-w", 1);
+    long uNumThreads          = ctrl.getOptionInt("Spectrometer", "num_fft_threads", "-m", 4);
+    long uNumBuffers          = ctrl.getOptionInt("Spectrometer", "num_fft_buffers", "-b", 400);
+    
+    // Raw data dumper configuration
+    long uNumDumpBuffers      = ctrl.getOptionInt("Spectrometer", "num_dump_buffers", "-b", 1000);
+    
+    // Run configuration
+    long uStopCycles          = ctrl.getOptionInt("Spectrometer", "stop_cycles", "-c", 0); 
+    double dStopSeconds       = ctrl.getOptionReal("Spectrometer", "stop_seconds", "-s", 0);
+    string sStopTime          = ctrl.getOptionStr("Spectrometer", "stop_time", "-u", "");
+    bool bPlot                = ctrl.getOptionBool("Spectrometer", "show_plots", "-p", false);    
+    long uPlotBin             = ctrl.getOptionInt("Spectrometer", "plot_bin", "-B", 1);  
+    bool bDump                = ctrl.getOptionBool("Spectrometer", "dump_raw_data", "-y", false); 
+
 
     // Handle help flag if set (do this after parsing configuration so that the
     // configuration options are visible as part of the help message).
@@ -193,7 +208,8 @@ int main(int argc, char* argv[])
 
     // Set some controls (the controller parses the configuration, but doesn't
     // used any of the info until explictly told)
-    ctrl.setPlot(bPlot, (unsigned int) uPlotBin);    
+    ctrl.setPlot(bPlot, (unsigned int) uPlotBin); 
+    ctrl.setDump(bDump);    
     ctrl.setOutput(sDataDir, sSite, sInstrument, sOutput);
 
     // Calculate a few derived configuration parameters
@@ -264,6 +280,18 @@ int main(int argc, char* argv[])
                uNumChannels, 
                uNumTaps, 
                uWindowFunctionId );
+               
+               
+    // -----------------------------------------------------------------------
+    // Initialize the asynchronous raw data dumper
+    // -----------------------------------------------------------------------   
+    Dumper dump ( uSamplesPerAccum*dig.bytesPerSample(),
+                  uSamplesPerTransfer*dig.bytesPerSample(), 
+                  uNumDumpBuffers,
+                  dig.type(),
+                  dig.scale(),
+                  dig.offset() );
+               
 
     // -----------------------------------------------------------------------
     // Initialize the Spectrometer
@@ -274,6 +302,7 @@ int main(int argc, char* argv[])
                        dSwitchDelay,
                        (Digitizer*) &dig,
                        (Channelizer*) &chan,
+                       &dump,
                        (Switch*) &sw, 
                        &ctrl );
 

@@ -24,12 +24,6 @@ class Buffer {
 
 	public:
 
-  // Enumerator for pushing data of different types into buffer (avoiding templates)
-  typedef enum pushType {
-    uint16 = 0,
-    int16 = 1
-  } pushType;
-  
 	// Nested class for the items used in the internal <list>.   
 	// These items have a member variable to track the number of 
 	// iterators pointing to each item.

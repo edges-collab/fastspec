@@ -81,7 +81,10 @@ void Buffer::allocate(unsigned int uNumItems, unsigned int uItemLength) {
 // request
 // ----------------------------------------------------------------------------
 // Get the iterator of the next available item.  Fails and returns false if 
-// fewer than uNumAvailable items remain in the queue.
+// fewer than uNumAvailable items remain in the queue.  Adds a hold to the next
+// available item, but not to any beyond that (even if uNumAvailable > 1).  
+// Advances the buffer iterator head marker (m_pos) one step (even if 
+// uNumAvailable > 1).
 bool Buffer::request(Buffer::iterator& iter, unsigned int uNumAvailable) {
 
   bool bReturn = true;
@@ -118,10 +121,10 @@ bool Buffer::request(Buffer::iterator& iter, unsigned int uNumAvailable) {
     	// Add a hold to the item
     	(iter.it)->uHolds++;
 
-      // Increment m_pos
+      // Increment the buffer iterator head marker (m_pos)
       m_pos++;
 
-      // Increment the current holds counter
+      // Increment the current total holds counter
       m_uHolds++;
     } 
   }
@@ -169,7 +172,9 @@ bool Buffer::available(Buffer::iterator& iter, unsigned int uNumAvailable) {
 // next
 // ----------------------------------------------------------------------------
 // Safely increment the iterator to next item, with appropriate holds.  Returns
-// false if no more items in buffer.
+// false if no more items in buffer.  Does not advance the buffer's iterator  
+// head marker (m_pos).  Use Buffer::request to increment the iterator and 
+// advance the buffer iterator head marker.
 bool Buffer::next(Buffer::iterator& iter) {
 	
   bool bReturn = true;

@@ -21,8 +21,10 @@ Controller::Controller() {
   m_iMode = CTRL_MODE_NOTSET;
   m_bStopSignal = false;
   m_bPlot = false;
+  m_bDump = false;
   m_pSpawn = NULL;
   m_uPlotBin = 1;
+  m_uDumpCycles = 1;
   m_bDirectory = true;
 }
 
@@ -41,10 +43,8 @@ Controller::~Controller() {
     case CTRL_MODE_START:
       printf("Controller: Removing PID file\n");
       deletePID();
+      deleteMsg();
       break;
-
-    case CTRL_MODE_STOP:
-      break; 
   }
 
   if (m_pIni) {
@@ -66,6 +66,14 @@ void Controller::deletePID() {
 // ----------------------------------------------------------------------------
 void Controller::deletePlot() {
   std::remove(PLOT_FILE);
+}
+
+
+// ----------------------------------------------------------------------------
+// deleteMsg - Deletes any existing message file
+// ----------------------------------------------------------------------------
+void Controller::deleteMsg() {
+  std::remove(MSG_FILE);
 }
 
 
@@ -317,23 +325,96 @@ void Controller::onSignal(int iSignalNumber) {
 
       // Set the stop flag
       m_bStopSignal = true;
-      break;
+      break; // SIGINT
 
     case SIGUSR1:
-      printf(BLU "----------------------------------------------------------------------\n" RESET);
-      printf(BLU "*** SHOW PLOT signal received ***\n" RESET);
-      printf(BLU "----------------------------------------------------------------------\n" RESET);         
-      setPlot(true, m_uPlotBin);
-      break;
+    
+      int iMsg = 0;
+      if (readMsg(iMsg)) {
 
-    case SIGUSR2:
-      printf(BLU "----------------------------------------------------------------------\n" RESET);
-      printf(BLU "*** HIDE PLOT signal received ***\n" RESET);
-      printf(BLU "----------------------------------------------------------------------\n" RESET);         
-      setPlot(false, m_uPlotBin);
-      break;
+        switch (iMsg) {
+        
+          case CTRL_MODE_SHOW:
+            printf(BLU "----------------------------------------------------------------------\n" RESET);
+            printf(BLU "*** SHOW PLOT signal received ***\n" RESET);
+            printf(BLU "----------------------------------------------------------------------\n" RESET);         
+            setPlot(true, m_uPlotBin);
+            break;
+
+          case CTRL_MODE_HIDE:
+            printf(BLU "----------------------------------------------------------------------\n" RESET);
+            printf(BLU "*** HIDE PLOT signal received ***\n" RESET);
+            printf(BLU "----------------------------------------------------------------------\n" RESET);         
+            setPlot(false, m_uPlotBin);
+            break;
+
+          case CTRL_MODE_DUMP_START:
+            printf(BLU "----------------------------------------------------------------------\n" RESET);
+            printf(BLU "*** BEGIN RAW DATA DUMP signal received ***\n" RESET);
+            printf(BLU "----------------------------------------------------------------------\n" RESET);         
+            setDump(true);
+            break;
+            
+          case CTRL_MODE_DUMP_STOP:
+            printf(BLU "----------------------------------------------------------------------\n" RESET);
+            printf(BLU "*** END RAW DATA DUMP signal received ***\n" RESET);
+            printf(BLU "----------------------------------------------------------------------\n" RESET);         
+            setDump(false);
+            break;   
+        }       
+      } else {
+        printf("\n\n*** Received new message signal, but failed to read message***\n\n");
+      }
+      
+      break; // SIGUSR1
   }
 }
+
+std::string Controller::getDumpFilePath(const TimeKeeper& tk, bool bMakePath) {
+
+  std::string sOutput;
+
+  // We only expect to be in this function when we have just started a 
+  // a new antenna position accumulation.  We expect the dump start timestamp  
+  // and the new antenna accumulator start timestamp to be identical.
+  
+  // Use the autonaming scheme
+  if (m_bDirectory) {
+  
+    // If we already have an active ACQ filepath, then only change the base
+    // if the day has changed (in anticipation of the ACQ filepath changing
+    // on its next write, too).
+    if ( m_sOutput.empty() || (m_tkPrevStartTime.doy() != tk.doy()) ) {
+
+      sOutput = construct_filepath_name( std::string(m_sDataDir + "/" + m_sSite + "/" + m_sInstrument),
+                                         tk.getFileString(5), m_sInstrument, 
+                                         "__" + tk.getFileString(5) + ".dmp" );
+                                         
+    // If we don't have a existing ACQ filepath, create a new one (in
+    // anticipation of the same ACQ filepath being created on its next write)
+    } else {
+      sOutput = construct_filepath_name( std::string(m_sDataDir + "/" + m_sSite + "/" + m_sInstrument),
+                                         m_tkPrevStartTime.getFileString(5), m_sInstrument,  
+                                         "__" + tk.getFileString(5) + ".dmp" );
+    }
+    
+  // Use the user specified filepath as a base and add our suffix
+  } else {
+    sOutput = get_filepath_without_extension(m_sOutput) + "__" + tk.getFileString(5) + ".dmp";
+  }
+
+  // Make the directory structure needed for the filepath
+  if (bMakePath) {
+    if (!make_path(get_path(m_sOutput), 0775)) {
+      printf("Controller: Failed to make path to new file.\n");
+    }
+  }
+  
+  return sOutput;
+    
+}
+
+
 
 void Controller::onSpectrometerData( Accumulator& acc0, Accumulator& acc1, 
                                      Accumulator& acc2 ) {
@@ -355,9 +436,6 @@ void Controller::onSpectrometerData( Accumulator& acc0, Accumulator& acc1,
     bStartFile = true;
   }
 
-  // Note the start time of the current data
-  m_tkPrevStartTime = acc0.getStartTime();
-
 
   // Write the .acq entry
   printf("Controller: Writing to file: %s\n", m_sOutput.c_str());
@@ -365,6 +443,9 @@ void Controller::onSpectrometerData( Accumulator& acc0, Accumulator& acc1,
   // If needed, start a new file and write the header
   if (bStartFile) {
 
+    // Note the start time of the current data
+    m_tkPrevStartTime = acc0.getStartTime();
+  
     // Make the directory structure
     if (!make_path(get_path(m_sOutput), 0775)) {
       printf("Controller: Failed to make path to new .acq file.\n");
@@ -407,10 +488,18 @@ bool Controller::plot() const {
 
 
 // ----------------------------------------------------------------------------
-// readControlFile - Read existing control file and get its contained pid and 
+// dump - return true if should dump raw dadta, false if not
+// ----------------------------------------------------------------------------
+bool Controller::dump() const { 
+  return m_bDump; 
+}
+
+
+// ----------------------------------------------------------------------------
+// readPID - Read existing PID file and get its contained pid and 
 //                   starttime.  Returns false if can't open the file
 // ----------------------------------------------------------------------------
-bool Controller::readControlFile(pid_t& pid, unsigned long long& tm) {
+bool Controller::readPID(pid_t& pid, unsigned long long& tm) {
 
   pid = 0;
   tm = 0;
@@ -429,6 +518,27 @@ bool Controller::readControlFile(pid_t& pid, unsigned long long& tm) {
   return true;
 }
 
+// ----------------------------------------------------------------------------
+// readMsg - Read existing message file. Returns false if can't open the file
+// ----------------------------------------------------------------------------
+bool Controller::readMsg(int& iMsg) {
+
+  iMsg = 0;
+
+  std::ifstream fs;
+  fs.open(MSG_FILE);
+  if (!fs.is_open()) {
+    return false;
+  } 
+
+  fs >> iMsg;
+
+  fs.close();
+  
+  deleteMsg();
+  
+  return true;
+}
 
 // ----------------------------------------------------------------------------
 // registerHandler - Register a passed wrapper function pointer as the handler  
@@ -444,7 +554,6 @@ void Controller::registerHandler(void (*handler)(int)) {
   sigemptyset(&sAction.sa_mask);
   sigaction(SIGINT,&sAction, NULL);
   sigaction(SIGUSR1,&sAction, NULL);
-  sigaction(SIGUSR2,&sAction, NULL);
 }  
 
 
@@ -460,94 +569,100 @@ bool Controller::run(int iMode) {
   pid_t oldpid;
   unsigned long long oldtime;
 
-  bool bExistingFile = readControlFile(oldpid, oldtime);
+  bool bExistingFile = readPID(oldpid, oldtime);
   bool bExistingProc = bExistingFile                              // A control file exists
                         && (oldpid != 0)                          // A reasonable old PID was found in the file
                         && (kill(oldpid, 0) == 0)                 // The old PID is currently running and accessible
                         && (oldtime == getProcStart(oldpid));     // Retrieving the starttime for the old PID now matches what is recorded in the file
 
 
-  // Execute
+  // Allow the app to show help without starting a new control file
+  if (iMode==CTRL_MODE_HELP) {
+    return true;
+  } 
+   
+  // Start normal execution
+  if (iMode == CTRL_MODE_START) {
+
+    // Abort if valid existing process, otherwise record our process info
+    if (bExistingProc) {
+      
+      printf("Controller: An instance of FASTSPEC is already running.  Use 'fastspec stop'\n");
+      printf("Controller: to gracefully temrinate the existing instance.  Aborting...\n\n");
+
+      // Change the mode to ABORT so the deconstructor doesn't delete
+      // the PID file that belongs to the other process.
+      m_iMode = CTRL_MODE_ABORT;
+      return false;
+
+    }
+    
+    printf("Controller: Writing this PID (%d) to " PID_FILE "\n", getpid());
+    writePID();
+    return true;   
+  } 
+  
+  if (!bExistingProc) {
+    printf("Controller: No valid existing instance found\n");
+    return false;
+  }
+      
+  // Execute one of the signal modes
   switch (iMode) {
-
-    // Start execution
-    case CTRL_MODE_START:
-
-      // Abort if valid existing process, otherwise record our process info
-      if (bExistingProc) {
-        
-        printf("Controller: An instance of FASTSPEC is already running.  Use 'fastspec stop'\n");
-        printf("Controller: to gracefully temrinate the existing instance.  Aborting...\n\n");
-
-        // Change the mode to ABORT so the deconstructor doesn't delete
-        // the PID file that belongs to the other process.
-        m_iMode = CTRL_MODE_ABORT;
-        return false;
-
-      } else {
-        printf("Controller: Writing this PID (%d) to " PID_FILE "\n", getpid());
-        writeControlFile();
-        return true;
-      }
-      break;
 
     // Stop execution (gracefully) of an existing instance if a valid pid exists
     case CTRL_MODE_STOP:
 
       if (bExistingProc) {
         printf("Controller: Sending stop signal to previous PID (%d)\n", oldpid);
-        sendStopSignal(oldpid);
+        kill(oldpid, SIGINT);
         return false;
       }
       
-      printf("Controller: No valid existing instance found\n");
-      return false;
-      break;
-
     // Forcibly kill execution of an existing instance if a valid pid exists
     case CTRL_MODE_KILL:
 
       if (bExistingProc) {
         printf("Controller: Sending kill -9 signal to previous PID (%d)\n", oldpid);
-        sendKillSignal(oldpid);
+        kill(oldpid, SIGKILL);
         return false;
       }
-      
-      printf("Controller: No valid existing instance found\n");
-      return false;
-      break;
-
+          
     // Tell existing instance to start plotting
     case CTRL_MODE_SHOW:
 
       if (bExistingProc) {
         printf("Controller: Sending show plot signal to previous PID (%d)\n", oldpid);
-        sendShowPlotSignal(oldpid);
+        sendMsg(oldpid, iMode);
         return false;
       }
       
-      printf("Controller: No valid existing instance found\n");
-      return false;
-      break;
-
-    // Allow the app to show help without starting a new control file
-    case CTRL_MODE_HELP:
-     
-      return true;
-      break;
-
     // Tell existing instance to stop plotting
     case CTRL_MODE_HIDE:
 
       if (bExistingProc) {
         printf("Controller: Sending hide plot signal to previous PID (%d)\n", oldpid);
-        sendHidePlotSignal(oldpid);
+        sendMsg(oldpid, iMode);
         return false;
       }
       
-      printf("Controller: No valid existing instance found\n");
-      return false;
-      break;
+    // Tell existing instance to start dumping raw data
+    case CTRL_MODE_DUMP_START:
+
+      if (bExistingProc) {
+        printf("Controller: Sending start raw data dump signal to previous PID (%d)\n", oldpid);
+        sendMsg(oldpid, iMode);
+        return false;
+      }
+      
+    // Tell existing instance to start dumping raw data
+    case CTRL_MODE_DUMP_STOP:
+
+      if (bExistingProc) {
+        printf("Controller: Sending stop raw data dump signal to previous PID (%d)\n", oldpid);
+        sendMsg(oldpid, iMode);
+        return false;
+      }
   }
 
   return false;
@@ -555,34 +670,20 @@ bool Controller::run(int iMode) {
 
 
 // ----------------------------------------------------------------------------
-// sendStopSignal - Sends the stop signal to the specified PID
+// sendMsg - Writes message to file and sends signal to the specified PID
 // ----------------------------------------------------------------------------
-int Controller::sendStopSignal(pid_t pid) {
-  return kill(pid, SIGINT);
-}
-
-
-// ----------------------------------------------------------------------------
-// sendKillSignal - Sends the hard kill signal to the specified PID
-// ----------------------------------------------------------------------------
-int Controller::sendKillSignal(pid_t pid) {
-  return kill(pid, SIGKILL);
-}
-
-
-// ----------------------------------------------------------------------------
-// sendShowPlotSignal - Sends the show plots signal to the specified PID
-// ----------------------------------------------------------------------------
-int Controller::sendShowPlotSignal(pid_t pid) {
+int Controller::sendMsg(pid_t pid, int iMsg) {
+  
+  std::ofstream fs;
+  fs.open(MSG_FILE);
+  if (fs.is_open()) {
+    fs << iMsg;
+    fs.close();
+  } else {
+    return -1;
+  }
+  
   return kill(pid, SIGUSR1);
-}
-
-
-// ----------------------------------------------------------------------------
-// sendHidePlotSignal - Sends the hide plots signal to the specified PID
-// ----------------------------------------------------------------------------
-int Controller::sendHidePlotSignal(pid_t pid) {
-  return kill(pid, SIGUSR2);
 }
 
 
@@ -662,6 +763,17 @@ void Controller::setPlot(bool bPlot, unsigned int uPlotBin) {
 
 
 // ----------------------------------------------------------------------------
+// setDump - Tell the controller that there should be dumping (or not).
+//           
+// ----------------------------------------------------------------------------
+void Controller::setDump(bool bDump) { 
+
+  m_bDump = bDump; 
+
+}
+
+
+// ----------------------------------------------------------------------------
 // stop - Returns true if a stop signal has bene received
 // ----------------------------------------------------------------------------
 bool Controller::stop() const { 
@@ -720,11 +832,11 @@ void Controller::updatePlotter() {
 
 
 // ----------------------------------------------------------------------------
-// writeControlFile - (Over)write PID and the process start time to file so
+// writePID - (Over)write PID and the process start time to file so
 //                  - so another instance of the executable can verify that 
 //                  - that one is/isn't already running.    
 // ----------------------------------------------------------------------------
-bool Controller::writeControlFile() {
+bool Controller::writePID() {
 
   std::ofstream fs;
   fs.open(PID_FILE);
@@ -737,4 +849,7 @@ bool Controller::writeControlFile() {
 
   return false;
 }
+
+
+
 

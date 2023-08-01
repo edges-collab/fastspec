@@ -82,11 +82,11 @@ TARGET := $(TARGET_BASE)_$(digitizer)_$(switch)_$(precision)
 INSTALL := /usr/local/bin
 
 # Files and libraries shared by all configurations
-CORE_SRCS := buffer.cpp fastspec.cpp ini.cpp spectrometer.cpp controller.cpp \
-  pfb.cpp utility.cpp 
-CORE_HDRS := accumulator.h controller.h pfb.h switch.h version.h buffer.h \
-  digitizer.h spawn.h timing.h wdt_dio.h channelizer.h ini.h spectrometer.h \
-  utility.h
+CORE_SRCS := buffer.cpp bytebuffer.cpp controller.cpp dumper.cpp fastspec.cpp \
+	ini.cpp pfb.cpp spectrometer.cpp utility.cpp 
+CORE_HDRS := accumulator.h buffer.h bytebuffer.h channelizer.h controller.h  \
+	digitizer.h dumper.h ini.h pfb.h spectrometer.h switch.h spawn.h timing.h  \
+	utility.h version.h wdt_dio.h 
 CORE_LIBS := -pthread -lrt
 CORE_CFLAGS := -Wall -O3 -mtune=native -std=c++0x -L/usr/lib
 
@@ -100,7 +100,7 @@ CORE_CFLAGS := -Wall -O3 -mtune=native -std=c++0x -L/usr/lib
 
 # TARGET -- $(TARGET):  Builds the executable using the options specified on 
 #                       make command line
-$(TARGET): $(CORE_SRCS) $(DIG_SRCS) $(SW_SRCS) $(DIG_HDRS) $(SW_HDRS)
+$(TARGET): $(CORE_SRCS) $(DIG_SRCS) $(SW_SRCS) $(CORE_HDRS) $(DIG_HDRS) $(SW_HDRS)
 
 ifdef ERROR_DIG
 	# Abort with error message
@@ -116,7 +116,7 @@ endif
 
 ifdef USE_DEFAULT_PRECISION
 	@echo ""
-	@echo "WARNING: Floating point math precision not specified or not recogized on" 
+	@echo "WARNING: Floating point math precision not specified or not recognized on" 
 	@echo "         make command line. Proceeding with single precision. Use make"  
 	@echo "         argument: precision=[single, double]"
 endif 

@@ -6,6 +6,7 @@
 #include "accumulator.h"
 #include "digitizer.h"
 #include "channelizer.h"
+#include "dumper.h"
 #include "controller.h"
 #include "switch.h"
 #include "timing.h"
@@ -29,6 +30,7 @@ class Spectrometer : public DigitizerReceiver, ChannelizerReceiver {
     // Member variables
     Digitizer*      m_pDigitizer;
     Channelizer*    m_pChannelizer;
+    Dumper*         m_pDumper;
     Switch*         m_pSwitch;
     Controller*     m_pController;    
     Accumulator     m_accumAntenna;
@@ -49,6 +51,7 @@ class Spectrometer : public DigitizerReceiver, ChannelizerReceiver {
     bool            m_bUseStopCycles;
     bool            m_bUseStopSeconds;
     bool            m_bUseStopTime;
+    bool            m_bDumpingThisCycle;
     unsigned long   m_uStopCycles;
     double          m_dStopSeconds;             // Seconds
     TimeKeeper      m_tkStopTime;               // UTC
@@ -63,7 +66,7 @@ class Spectrometer : public DigitizerReceiver, ChannelizerReceiver {
 
     // Constructor and destructor
     Spectrometer( unsigned long, unsigned long, double, double, 
-                  Digitizer*, Channelizer*, Switch*, Controller* );
+                  Digitizer*, Channelizer*, Dumper*, Switch*, Controller*);
     ~Spectrometer();
 
     // Execution functions

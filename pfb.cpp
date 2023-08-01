@@ -29,7 +29,7 @@ PFB::PFB( unsigned int uNumThreads, unsigned int uNumBuffers,
   setWindowFunction(uWindow);
 
   // Create buffers
-  printf("PFB: Creating %d buffers (%g MB)...\n", m_uNumBuffers, 
+  printf("\nPFB: Creating %d buffers (%g MB)...\n", m_uNumBuffers, 
     ((float) m_uNumBuffers)*m_uNumFFT*sizeof(BUFFER_DATA_TYPE)/1024/1024);
   m_buffer.allocate(m_uNumBuffers, m_uNumFFT);
 

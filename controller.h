@@ -2,6 +2,7 @@
 #define _CONTROLLER_H_
 
 #define PID_FILE        "/tmp/fastspec.pid"
+#define MSG_FILE        "/tmp/fastspec.msg"
 #define PLOT_FILE       "/tmp/fastspec_plot.txt"
 #define PLOTTER_EXE     "/usr/bin/gnuplot"
 #define PROC_DIR        "/proc"
@@ -14,6 +15,8 @@
 #define CTRL_MODE_KILL          5
 #define CTRL_MODE_HELP          6
 #define CTRL_MODE_ABORT         7
+#define CTRL_MODE_DUMP_START    8
+#define CTRL_MODE_DUMP_STOP     9
 
 #include <string>
 #include <unistd.h>     // pid
@@ -55,6 +58,9 @@ class Controller {
     double getOptionReal(const std::string&, const std::string&, const std::string&, double);
     std::string getOptionStr(const std::string&, const std::string&, const std::string&, const std::string&);
 
+    // Return the filepath that should be used to start a new raw data dump file
+    std::string getDumpFilePath(const TimeKeeper& tk, bool bMakePath);
+
     // Return mode of operation
     int mode() const;
 
@@ -66,6 +72,9 @@ class Controller {
 
     // True if should show plots, false if should hide plots
     bool plot() const;
+    
+    // True if should dump raw digitizer data, false if should not
+    bool dump() const;
 
     // Set the run mode and check for an existing application
     // instance.  Returns false if this application should 
@@ -82,9 +91,12 @@ class Controller {
     void setOutput( const std::string&, const std::string&, 
                     const std::string&, const std::string& );
 
-    // Tell the controller that there should be plotting and how to bin data
+    // Tell the controller if there should be plotting and how to bin data
     void setPlot(bool, unsigned int);
 
+    // Tell the controller if there should be raw data dumping
+    void setDump(bool);
+    
     // True if a stop signal has bene received
     bool stop() const;    
 
@@ -107,36 +119,32 @@ class Controller {
     // Delete existing PID file
     void deletePID();
 
-    // Delete existing PID file
+    // Delete existing plot file
     void deletePlot();
 
-    // Returns the filepath that should be used to write spectrometer data
-    std::string getAcqPath();
-
+    // Delete existing message file
+    void deleteMsg();
+    
     // Get the start time associated with a PID
     unsigned long long getProcStart(pid_t pid);
 
     // Read existing control file and get its contained pid and starttime.
     // Returns false if can't open the file
-    bool readControlFile(pid_t& pid, unsigned long long& tm); 
+    bool readPID(pid_t& pid, unsigned long long& tm); 
+    
+    // Read existing message file.
+    // Returns false if can't open the file    
+    bool readMsg(int& msg);
 
-    // Sends the stop signal
-    int sendStopSignal(pid_t pid);
-
-    // Sends a hard kill signal
-    int sendKillSignal(pid_t pid);
-
-    // Sends a signal to show plots
-    int sendShowPlotSignal(pid_t pid);
-
-    // Sends a signal to stop showing plots
-    int sendHidePlotSignal(pid_t pid);
-
+    // Sends the appropriate message and notification signal
+    int sendMsg(pid_t pi, int msg);
+    
     // Shutdown the external plotter
     void stopPlotter();
 
     // (Over)write PID to file
-    bool writeControlFile();
+    bool writePID();
+       
 
     // ------------------------
     // Private member variables
@@ -145,9 +153,11 @@ class Controller {
     char**          m_argv;
     INIReader*      m_pIni;
     bool            m_bPlot;
+    bool            m_bDump;
     bool            m_bStopSignal;
     int             m_iMode;
     unsigned int    m_uPlotBin;
+    unsigned int    m_uDumpCycles;
     spawn*          m_pSpawn;
     std::string     m_strConfig;
     std::string     m_sDataDir;

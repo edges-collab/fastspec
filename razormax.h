@@ -64,7 +64,12 @@ class RazorMax : public Digitizer {
     // Main execution function
     bool acquire();
     void stop();
-
+    
+    // Description functions
+    double scale();
+    double offset();
+    unsigned int bytesPerSample();
+    Digitizer::DataType type();
 };
 
 

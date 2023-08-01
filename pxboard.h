@@ -59,6 +59,12 @@ class PXBoard : public Digitizer {
     bool acquire();
     void stop();
 
+    // Description functions
+    double scale();
+    double offset();
+    unsigned int bytesPerSample();
+    Digitizer::DataType type();
+    
 };
 
 

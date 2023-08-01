@@ -106,11 +106,11 @@ class PXSim : public Digitizer {
       m_dCWFreq2 = 0;
       m_dCWAmp2 = 0;   
       m_dNoiseAmp = 0;   
+      m_dScale =  1.0/32768;
+      m_dOffset = -1.0;
       m_dAcquisitionRate = dAcquisitionRate;     // MS/s
       m_uSamplesPerAccumulation = uSamplesPerAccumulation;
       m_uSamplesPerTransfer = uSamplesPerTransfer;  
-      m_dScale = 1.0/32768;
-      m_dOffset = -1.0;
       printf("Using SIMULATED digitizer\n");
       
       m_pBuffer = (SAMPLE_DATA_TYPE*) malloc(m_uSamplesPerTransfer * sizeof(SAMPLE_DATA_TYPE));
@@ -240,6 +240,14 @@ class PXSim : public Digitizer {
     void setCallback(DigitizerReceiver* pReceiver) { m_pReceiver = pReceiver; }
 
     void stop() { m_bStop = true; }
+    
+    double scale() { return m_dScale; }
+    
+    double offset() { return m_dOffset; }
+    
+    unsigned int bytesPerSample() { return 2; }
+    
+    Digitizer::DataType type() { return Digitizer::DataType::uint16; }
 
 };
 

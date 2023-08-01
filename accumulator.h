@@ -228,7 +228,11 @@ class Accumulator {
 
     void setStartTime() { m_startTime.setNow(); }
     
+    void setStartTime(const TimeKeeper& tk) { m_startTime = tk; }
+    
     void setStopTime() { m_stopTime.setNow(); }
+    
+    void setStopTime(const TimeKeeper& tk) { m_stopTime = tk; }
 
     void setTemperature(double dTemperature) { m_dTemperature = dTemperature; }
 

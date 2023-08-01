@@ -27,8 +27,9 @@ Spectrometer::Spectrometer(unsigned long uNumChannels,
                            double dSwitchDelayTime,
                            Digitizer* pDigitizer,
                            Channelizer* pChannelizer,
+                           Dumper* pDumper,
                            Switch* pSwitch,
-                           Controller* pController)
+                           Controller* pController )
 {
 
   // User specified configuration
@@ -55,6 +56,10 @@ Spectrometer::Spectrometer(unsigned long uNumChannels,
   // Remember the controller
   m_pController = pController;
 
+  // Rember the antenna raw data dumper (if present)
+  m_pDumper = pDumper;
+  m_bDumpingThisCycle = false;
+  
   // Initialize the Accumulators
   m_accumAntenna.init( m_uNumChannels, m_dStartFreq, 
                    m_dStopFreq, m_dChannelFactor );
@@ -100,6 +105,12 @@ Spectrometer::~Spectrometer()
 
     // Disconnect
     m_pChannelizer->setCallback(NULL);
+  }
+  
+  // Disconnect from dumper if we didn't finish 
+  if (m_bDumpingThisCycle) {
+    m_pDumper->waitForEmpty();
+    m_pDumper->closeFile();
   }
 
 } // destructor
@@ -153,17 +164,14 @@ void Spectrometer::run()
         return; 
       }
 
-      tk.setNow();
-      printf("Spectrometer: Starting switch state %d at %s\n", i, tk.getDateTimeString(5).c_str());
-
-      // Change receiver switch state and pause briefly for it to take effect
+      // Set receiver switch state and pause briefly for it to take effect
       m_pSwitch->set(i);
       usleep((unsigned int) (m_dSwitchDelayTime * 1e6)); 
 
       // Wait for any previous channelizer processes still running to finish
       m_pChannelizer->waitForEmpty();
-
-      // Reset the accumulator and record the start time
+                
+      // Reset the accumulator
       switch(i) {
         case 0:
           m_pCurrentAccum = &m_accumAntenna;
@@ -176,9 +184,20 @@ void Spectrometer::run()
           break;
       }
 
-      m_pCurrentAccum->clear();
-      m_pCurrentAccum->setStartTime();
+      // Mark state of new cycle
+      tk.setNow();
+      printf("Spectrometer: Starting switch state %d at %s\n", i, tk.getDateTimeString(5).c_str());
 
+      // Reset current accumulator and record start time
+      m_pCurrentAccum->clear();
+      m_pCurrentAccum->setStartTime(tk);
+
+      // Start a fresh raw data dump if on antenna position and dump requested
+      if (m_pController->dump() && i==0) {
+        m_bDumpingThisCycle = true;
+        m_pDumper->openFile(m_pController->getDumpFilePath(tk, true), tk);
+      }   
+      
       // Acquire data
       m_pDigitizer->acquire();
 
@@ -188,6 +207,13 @@ void Spectrometer::run()
 
     // Wait for any remaining channelizer processes to finish
     m_pChannelizer->waitForEmpty();
+    
+    // Wait for any remaining dump process to finish (we only dump antenna data
+    // so we don't need to wait until the end of the entire switch cycle)
+    if (m_bDumpingThisCycle) {
+      m_pDumper->waitForEmpty();
+      m_pDumper->closeFile();
+    }
 
     // Normalize ADCmin and ADCmax:  we divide adcmin and adcmax by 2 here to  
     // be backwards compatible with pxspec.  This limits adcmin and adcmax to 
@@ -200,7 +226,7 @@ void Spectrometer::run()
     m_accumHotLoad.setADCmax(m_accumHotLoad.getADCmax()/2);
     
     // Write to ACQ
-    writeTimer.tic();;
+    writeTimer.tic();
     printf("\nSpectrometer: Writing to file...\n");
     m_pController->onSpectrometerData(m_accumAntenna, m_accumAmbientLoad, m_accumHotLoad);
     writeTimer.toc();
@@ -215,6 +241,9 @@ void Spectrometer::run()
     printf("Spectrometer: Accum time (ideal)     = %6.3f seconds\n", 3.0 * m_uNumSamplesPerAccumulation / (2.0 * 1e6 * m_dBandwidth));
     printf("Spectrometer: Switch time (ideal)    = %6.3f seconds\n", 3*m_dSwitchDelayTime);
     printf("Spectrometer: Write time             = %6.3f seconds\n", writeTimer.get());
+    if (m_bDumpingThisCycle) {
+      printf("Spectrometer: Raw data dump time     = %6.3f seconds\n", m_pDumper->getTimerInterval());
+    }
     printf("Spectrometer: Duty cycle             = %6.3f\n", dDutyCycle_Overall);
     if (uCycleDrops>0) {
       printf("Spectrometer: Drop fraction          = " RED "%6.3f\n" RESET, 1.0 * uCycleDrops / (m_uNumSamplesPerAccumulation + uCycleDrops));
@@ -226,6 +255,8 @@ void Spectrometer::run()
     printf("Spectrometer: p2 (hot)     -- acdmin = %6.3f,  adcmax = %6.3f\n", m_accumHotLoad.getADCmin(), m_accumHotLoad.getADCmax());
     printf("\n");
 
+    // Reset the dumping flag (we'll check again at the start of the next cycle)
+    m_bDumpingThisCycle = false;
   }
 
   // Print closing info
@@ -348,6 +379,13 @@ unsigned long Spectrometer::onDigitizerData( SAMPLE_DATA_TYPE* pBuffer,
   unsigned int uIndex = 0;
   unsigned int uAdded = 0;
   
+  // Try to add to the dumper if we're actively dumping data (antenna only)  
+  if (m_bDumpingThisCycle && (m_pSwitch->get() == 0)) { 
+    if (!m_pDumper->push( (void*) pBuffer, uBufferLength*m_pDigitizer->bytesPerSample() )) {
+      printf("Dumper failed push\n");
+    } 
+  }
+    
   // Loop over the transferred data and enter it into the channelizer buffer
   while ( ((uIndex + m_uNumFFT) <= uBufferLength) 
          && (uTransferredSoFar < m_uNumSamplesPerAccumulation)) {
@@ -356,8 +394,8 @@ unsigned long Spectrometer::onDigitizerData( SAMPLE_DATA_TYPE* pBuffer,
     if (m_pChannelizer->push(&(pBuffer[uIndex]), m_uNumFFT, dScale, dOffset)) { 
       uTransferredSoFar += m_uNumFFT;
       uAdded++;
-    } 
-
+    }  
+        
     // Increment the index to the next chunk of transferred data
     uIndex += m_uNumFFT;
   }

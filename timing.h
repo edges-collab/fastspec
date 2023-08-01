@@ -24,18 +24,31 @@ class Timer {
 
     // Constructor and destructor
     Timer() { 
-      m_tic.tv_sec = 0; 
-      m_tic.tv_nsec = 0; 
-      m_dInterval = 0; 
+      reset();
     }
 
     ~Timer() {}
 
-    // Public functions
+
+    // Rest to zero
+    void reset() {
+      m_tic.tv_sec = 0; 
+      m_tic.tv_nsec = 0; 
+      m_dInterval = 0; 
+    }      
+    
+    // Return the interval
     double get() const { return m_dInterval; }
 
-    void tic() { clock_gettime(CLOCK_MONOTONIC, &m_tic); } 
 
+    // Start the timer
+    void tic() { 
+      clock_gettime(CLOCK_MONOTONIC, &m_tic);
+      m_dInterval = 0; } 
+
+
+    // Record the difference between now and tic().  Updates each time it is
+    // called, always comparing to the original tic() time.
     double toc() { 
 
       struct timespec toc;
@@ -43,7 +56,24 @@ class Timer {
         
       // Calculate the difference between tic and toc in seconds
       m_dInterval = (toc.tv_sec - m_tic.tv_sec) + (toc.tv_nsec - m_tic.tv_nsec) / 1e9; 
+      
+      // If there was no tic before our toc, throw it out
+      if (m_dInterval < 0) {
+        m_dInterval = 0;
+      }      
 
+      return m_dInterval;
+    }
+      
+      
+    // Record the difference between now and tic.  Only updates if toc()
+    // toc_if_first() hasn't already been called.  Subsequent calls to toc()
+    // will overwrite this interval, but subsequent calls to toc_if_first()
+    // will not.
+    double toc_if_first() {
+      if (m_dInterval == 0) {
+        toc();
+      }
       return m_dInterval;
     }
 
@@ -82,6 +112,8 @@ class TimeKeeper {
     ~TimeKeeper() { }
 
     // Operator functions
+    TimeKeeper& operator=(const TimeKeeper& src) = default;
+       
     friend bool operator==(const TimeKeeper& lhs, const TimeKeeper& rhs)
     {
        return (lhs.m_dSecondsSince1970 == rhs.m_dSecondsSince1970);
