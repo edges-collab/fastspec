@@ -59,6 +59,8 @@ class Spectrometer : public DigitizerReceiver, ChannelizerReceiver {
 
     // Private helper functions
     std::string getFileName();
+    bool writeToAcqFile();
+    bool handleLivePlot();
     bool isStop(unsigned long, Timer&);
     bool isAbort();
 

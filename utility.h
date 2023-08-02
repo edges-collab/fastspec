@@ -47,7 +47,8 @@ std::string get_path( const std::string& );
 
 std::string get_filepath_without_extension(const std::string& );
 
-std::string construct_filepath_name(const std::string&, 
+std::string construct_filepath_base(const std::string&, 
+                                    const std::string&, 
                                     const std::string&, 
                                     const std::string&, 
                                     const std::string&);

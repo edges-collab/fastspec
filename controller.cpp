@@ -6,7 +6,6 @@
 #include <limits>       // numeric_limits<int>::max();
 #include "utility.h"    // font colors
 #include "controller.h"
-#include "version.h"
 
 
 
@@ -24,8 +23,7 @@ Controller::Controller() {
   m_bDump = false;
   m_pSpawn = NULL;
   m_uPlotBin = 1;
-  m_uDumpCycles = 1;
-  m_bDirectory = true;
+  m_bAutoName = true;
 }
 
 
@@ -370,114 +368,27 @@ void Controller::onSignal(int iSignalNumber) {
   }
 }
 
-std::string Controller::getDumpFilePath(const TimeKeeper& tk, bool bMakePath) {
 
-  std::string sOutput;
+std::string Controller::getPlotFilePath() {
+  return std::string(PLOT_FILE);
+}
 
-  // We only expect to be in this function when we have just started a 
-  // a new antenna position accumulation.  We expect the dump start timestamp  
-  // and the new antenna accumulator start timestamp to be identical.
-  
-  // Use the autonaming scheme
-  if (m_bDirectory) {
-  
-    // If we already have an active ACQ filepath, then only change the base
-    // if the day has changed (in anticipation of the ACQ filepath changing
-    // on its next write, too).
-    if ( m_sOutput.empty() || (m_tkPrevStartTime.doy() != tk.doy()) ) {
+std::string Controller::getDumpFilePath(const TimeKeeper& tk) {
+  return updateOutputBase(tk) + "__" + tk.getFileString(5) + ".dmp";
+}
 
-      sOutput = construct_filepath_name( std::string(m_sDataDir + "/" + m_sSite + "/" + m_sInstrument),
-                                         tk.getFileString(5), m_sInstrument, 
-                                         "__" + tk.getFileString(5) + ".dmp" );
-                                         
-    // If we don't have a existing ACQ filepath, create a new one (in
-    // anticipation of the same ACQ filepath being created on its next write)
-    } else {
-      sOutput = construct_filepath_name( std::string(m_sDataDir + "/" + m_sSite + "/" + m_sInstrument),
-                                         m_tkPrevStartTime.getFileString(5), m_sInstrument,  
-                                         "__" + tk.getFileString(5) + ".dmp" );
-    }
-    
-  // Use the user specified filepath as a base and add our suffix
-  } else {
-    sOutput = get_filepath_without_extension(m_sOutput) + "__" + tk.getFileString(5) + ".dmp";
-  }
-
-  // Make the directory structure needed for the filepath
-  if (bMakePath) {
-    if (!make_path(get_path(m_sOutput), 0775)) {
-      printf("Controller: Failed to make path to new file.\n");
-    }
-  }
-  
-  return sOutput;
-    
+std::string Controller::getAcqFilePath(const TimeKeeper& tk) {
+  return updateOutputBase(tk) + ".acq";
 }
 
 
-
-void Controller::onSpectrometerData( Accumulator& acc0, Accumulator& acc1, 
-                                     Accumulator& acc2 ) {
-
-  bool bStartFile = false;
-
-  // Create a new file if using directory method and it is first write 
-  // or a new day
-  if (m_bDirectory && (m_sOutput.empty() || (m_tkPrevStartTime.doy() != acc0.getStartTime().doy()) )) {
-
-    // Get the new path
-    m_sOutput = construct_filepath_name( std::string(m_sDataDir + "/" + m_sSite + "/" + m_sInstrument),
-                                          acc0.getStartTime().getFileString(5), m_sInstrument, ".acq" );
-    bStartFile = true;
-
-  // Overwrite anything in the user specified output file if this is 
-  // our first write and we're not using directory method
-  } else if (!m_bDirectory && (m_tkPrevStartTime == TimeKeeper())) {
-    bStartFile = true;
-  }
-
-
-  // Write the .acq entry
-  printf("Controller: Writing to file: %s\n", m_sOutput.c_str());
-
-  // If needed, start a new file and write the header
-  if (bStartFile) {
-
-    // Note the start time of the current data
-    m_tkPrevStartTime = acc0.getStartTime();
-  
-    // Make the directory structure
-    if (!make_path(get_path(m_sOutput), 0775)) {
-      printf("Controller: Failed to make path to new .acq file.\n");
-      return;
-    }
-    
-    // Write the header
-    std::ofstream fs;
-    fs.open(m_sOutput);
-    if (!fs.is_open()) {
-      printf("Controller: Failed to write header to new .acq file.\n");
-      return;
-    }
-    fs << "; FASTSPEC " << VERSION << std::endl;
-    fs << m_strConfig;
-    fs.close();
-  }
-
-  // Write the data
-  append_switch_cycle(m_sOutput, acc0, acc1, acc2);
-
-  // Handle plotting if enabled
-  if (m_bPlot) {
-
-    // Write the temporary file for plotting
-    write_plot_file(PLOT_FILE, acc0, acc1, acc2, m_uPlotBin);
-
-    // Tell the plotter to refresh
-    updatePlotter();
-  }
+// ----------------------------------------------------------------------------
+// getPlotBin - Number of neighboring spectral channels to bin together to
+//              reduce data length for live plot
+// ----------------------------------------------------------------------------
+unsigned int Controller::getPlotBinLevel() const { 
+  return m_uPlotBin; 
 }
-
 
 // ----------------------------------------------------------------------------
 // plot - return true if should show plots, false if not
@@ -716,25 +627,71 @@ bool Controller::setINI(const std::string& str) {
 
 
 // ----------------------------------------------------------------------------
-// setOutput
+// setOutputConfig
 // ----------------------------------------------------------------------------
-void Controller::setOutput( const std::string& sDataDir, 
-                            const std::string& sSite, 
-                            const std::string& sInstrument, 
-                            const std::string& sOutput) {
+void Controller::setOutputConfig( const std::string& sDataDir, 
+                                  const std::string& sSite, 
+                                  const std::string& sInstrument, 
+                                  const std::string& sUser) {
 
   m_sDataDir = sDataDir;
   m_sSite = sSite;
   m_sInstrument = sInstrument;
-  m_sOutput = sOutput;
-  m_bDirectory = sOutput.empty();
+  m_sUserSpecifiedAcqFilePath = sUser;
+  
+  // The user specified path takes priority if it provided, otherwise if it is
+  // empty we'll use our own autonaming scheme
+  m_bAutoName = sUser.empty();
 
-  if (m_bDirectory) {
+  if (m_bAutoName) {
     printf("Controller: Will write output to %s\n", std::string(sDataDir + "/" + sSite + "/" + sInstrument).c_str());
   } else {
-    printf("Controller: Will write output to %s\n", sOutput.c_str());
+    printf("Controller: Will write output to %s\n", sUser.c_str());
   }
 }
+
+// ----------------------------------------------------------------------------
+// updateOutputBase
+// ----------------------------------------------------------------------------
+std::string Controller::updateOutputBase(const TimeKeeper& tk) {
+ 
+  bool bUpdated = false;
+  
+  // Use the autonaming scheme
+  if (m_bAutoName) {
+  
+    // If we don't have an active filepath base or the day has changed since our
+    // last update, create a new base.
+    if ( m_sCurrentFilePathBase.empty() || (m_tkCurrentFilePathTime.doy() != tk.doy()) ) {
+
+      m_sCurrentFilePathBase = construct_filepath_base( 
+          m_sDataDir,
+          m_sSite,
+          m_sInstrument,
+          tk.getFileString(5),
+          m_sInstrument );
+     
+      m_tkCurrentFilePathTime = tk;  
+      
+      bUpdated = true;                                    
+    }
+    
+  // Use the user specified filepath as a base if it doesn't already exist
+  } else if ( m_sCurrentFilePathBase.empty() ) {
+    m_sCurrentFilePathBase = get_filepath_without_extension(m_sUserSpecifiedAcqFilePath);
+    bUpdated = true;
+  }
+
+  // Make the directory structure if we've changed the base
+  if (bUpdated) {
+    if (!make_path(get_path(m_sCurrentFilePathBase), 0775)) {
+      printf("Controller: Failed to make path to output destination.\n");
+    }
+  }
+  
+  return m_sCurrentFilePathBase;
+}
+
 
 
 
@@ -767,9 +724,7 @@ void Controller::setPlot(bool bPlot, unsigned int uPlotBin) {
 //           
 // ----------------------------------------------------------------------------
 void Controller::setDump(bool bDump) { 
-
   m_bDump = bDump; 
-
 }
 
 

@@ -158,7 +158,7 @@ int main(int argc, char* argv[])
     string sDataDir           = ctrl.getOptionStr("Installation", "datadir", "-d", "");
     string sSite              = ctrl.getOptionStr("Installation", "site", "-z", "");
     string sInstrument        = ctrl.getOptionStr("Installation", "instrument", "-j", "");
-    string sOutput            = ctrl.getOptionStr("Spectrometer", "output_file", "-f", "");
+    string sUserOutput        = ctrl.getOptionStr("Spectrometer", "output_file", "-f", "");
     
     // Switch configuration
     long uSwitchIOPort        = ctrl.getOptionInt("Spectrometer", "switch_io_port", "-o", 0x3010);
@@ -210,7 +210,7 @@ int main(int argc, char* argv[])
     // used any of the info until explictly told)
     ctrl.setPlot(bPlot, (unsigned int) uPlotBin); 
     ctrl.setDump(bDump);    
-    ctrl.setOutput(sDataDir, sSite, sInstrument, sOutput);
+    ctrl.setOutputConfig(sDataDir, sSite, sInstrument, sUserOutput);
 
     // Calculate a few derived configuration parameters
     double dBandwidth = dAcquisitionRate / 2.0;

@@ -2,6 +2,7 @@
 #include "spectrometer.h"
 #include "timing.h"
 #include "utility.h"
+#include "version.h"
 #include <unistd.h> // usleep
 
 #define SWITCH_SLEEP_MICROSECONDS 500000
@@ -126,6 +127,7 @@ void Spectrometer::run()
   Timer totalRunTimer;
   Timer dutyCycleTimer;
   Timer writeTimer;
+  Timer plotTimer;
   TimeKeeper tk;
   double dDutyCycle_Overall;
   unsigned long uCycleDrops = 0;
@@ -195,7 +197,7 @@ void Spectrometer::run()
       // Start a fresh raw data dump if on antenna position and dump requested
       if (m_pController->dump() && i==0) {
         m_bDumpingThisCycle = true;
-        m_pDumper->openFile(m_pController->getDumpFilePath(tk, true), tk);
+        m_pDumper->openFile(m_pController->getDumpFilePath(tk), tk);
       }   
       
       // Acquire data
@@ -227,9 +229,14 @@ void Spectrometer::run()
     
     // Write to ACQ
     writeTimer.tic();
-    printf("\nSpectrometer: Writing to file...\n");
-    m_pController->onSpectrometerData(m_accumAntenna, m_accumAmbientLoad, m_accumHotLoad);
+    //printf("\nSpectrometer: Writing to file...\n");
+    writeToAcqFile();
     writeTimer.toc();
+    
+    // Create plot file if needed
+    plotTimer.tic();
+    handleLivePlot();
+    plotTimer.toc();
 
     // Calculate overall duty cycle
     dutyCycleTimer.toc();
@@ -240,9 +247,12 @@ void Spectrometer::run()
     printf("Spectrometer: Cycle time             = %6.3f seconds\n", dutyCycleTimer.get());
     printf("Spectrometer: Accum time (ideal)     = %6.3f seconds\n", 3.0 * m_uNumSamplesPerAccumulation / (2.0 * 1e6 * m_dBandwidth));
     printf("Spectrometer: Switch time (ideal)    = %6.3f seconds\n", 3*m_dSwitchDelayTime);
-    printf("Spectrometer: Write time             = %6.3f seconds\n", writeTimer.get());
+    printf("Spectrometer: ACQ write time         = %6.3f seconds\n", writeTimer.get());
+    if (m_pController->plot()) {
+      printf("Spectrometer: Plot write time        = %6.3f seconds\n", plotTimer.get());
+    }
     if (m_bDumpingThisCycle) {
-      printf("Spectrometer: Raw data dump time     = %6.3f seconds\n", m_pDumper->getTimerInterval());
+      printf("Spectrometer: Dump time (async)      = %6.3f seconds\n", m_pDumper->getTimerInterval());
     }
     printf("Spectrometer: Duty cycle             = %6.3f\n", dDutyCycle_Overall);
     if (uCycleDrops>0) {
@@ -360,6 +370,62 @@ void Spectrometer::setStopTime(const string& strDateTime)
 
   printf("Spectrometer: Will stop at %s.\n", m_tkStopTime.getDateTimeString(5).c_str());
 }
+
+
+
+bool Spectrometer::writeToAcqFile() {
+
+  std::string sFilePath = m_pController->getAcqFilePath(m_accumAntenna.getStartTime());
+
+  // Write the .acq entry
+  printf("Spectrometer: Writing accumulations to file: %s\n", sFilePath.c_str());
+
+  // If needed, start a new file and write the header
+  if (!is_file(sFilePath)) {
+
+    // Write the header
+    std::ofstream fs;
+    fs.open(sFilePath);
+    if (!fs.is_open()) {
+      printf("Spectrometer: Failed to write header to new .acq file.\n");
+      return false;
+    }
+    fs << "; FASTSPEC " << VERSION << std::endl;
+    fs << m_pController->getConfigStr();
+    fs.close();
+  }
+
+  // Write the data
+  return append_switch_cycle( sFilePath, 
+                              m_accumAntenna, 
+                              m_accumAmbientLoad, 
+                              m_accumHotLoad );
+
+}
+
+
+// Handle output for live plotting if needed
+bool Spectrometer::handleLivePlot() {
+
+  if (!m_pController->plot()) {
+    return false;
+  }
+
+  // Write the temporary file for plotting
+  if ( !write_plot_file( m_pController->getPlotFilePath(), 
+                         m_accumAntenna, 
+                         m_accumAmbientLoad, 
+                         m_accumHotLoad,
+                         m_pController->getPlotBinLevel() ) ) {
+    return false;
+  }
+
+  // Tell the plotter to refresh
+  m_pController->updatePlotter();
+  return true;
+}
+  
+
 
 
 // ----------------------------------------------------------------------------

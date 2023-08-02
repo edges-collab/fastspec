@@ -114,18 +114,24 @@ bool make_path(const string& path, mode_t mode)
 
 
 // ----------------------------------------------------------------------------
-// construct_filepat_name
+// construct_filepath_base
+//
+// e.g. For the intended full filepath:
+//    /data/subfolder/site/instrument/2023/2023_123_11_10_01_label.acq
+// the filepath base is:
+//    /data/subfolder/site/instrument/2023/2023_123_11_10_01_label
+//
 // ----------------------------------------------------------------------------
-string construct_filepath_name(const string& sBase, 
+string construct_filepath_base(const string& sDataDir, 
+                               const string& sSite, 
+                               const string& sInstrument, 
                                const string& sDateString, 
-                               const string& sLabel, 
-                               const string& sSuffix)
+                               const string& sLabel)
 {
   // NOTE: sDateString must be in a format given by a TimeKeeper object
-  return sBase + "/" + sDateString.substr(0, 4) + "/" + sDateString + "_" + sLabel + sSuffix;
+  return sDataDir + "/" + sSite + "/" + sInstrument + "/" + 
+         sDateString.substr(0, 4) + "/" + sDateString + "_" + sLabel;
 }
-
-
 
 
 // ----------------------------------------------------------------------------
