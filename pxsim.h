@@ -205,7 +205,7 @@ class PXSim : public Digitizer {
       printf("PXSim: Continuous wave 1: amplitude %g at %g MHz\n", m_dCWAmp1, m_dCWFreq1);
       printf("PXSim: Continuous wave 2: amplitude %g at %g MHz\n", m_dCWAmp2, m_dCWFreq2);
       printf("PXSim: Uniform (not Gaussian) noise: amplitude %g\n", m_dNoiseAmp);
-      printf("PXSim: Constant offset %g\n", m_dOffset);
+      printf("PXSim: Constant offset %g\n", m_dVoltageOffset);
     }
 
     void setCallback(DigitizerReceiver* pReceiver) { m_pReceiver = pReceiver; }

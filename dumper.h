@@ -18,7 +18,6 @@ class Dumper {
     unsigned long                 m_uBytesPerAccumulation;
     unsigned int                  m_uBytesPerTransfer;
     unsigned long                 m_uBytesWritten;
-    unsigned int                  m_uNumBuffers;
     unsigned int                  m_uNumReady;
     unsigned int                  m_uDataType;
     double                        m_dSampleRate;

@@ -11,12 +11,13 @@
 // ----------------------------------------------------------------------------
 Dumper::Dumper( unsigned long uBytesPerAccumulation, 
                 unsigned int uBytesPerTransfer, unsigned int uNumBuffers, 
-                unsigned int uDataType, double dScale, double dOffset )
+                unsigned int uDataType, double dSampleRate,
+                double dScale, double dOffset )
 {
   m_uBytesPerAccumulation = uBytesPerAccumulation;
   m_uBytesPerTransfer = uBytesPerTransfer;
-  m_uNumBuffers = uNumBuffers;
   m_uDataType = uDataType;
+  m_dSampleRate = dSampleRate;
   m_dScale = dScale;
   m_dOffset = dOffset;
 
@@ -25,15 +26,12 @@ Dumper::Dumper( unsigned long uBytesPerAccumulation,
   m_bStop = false;
 
   // Create buffers
-  printf("\nDumper: Creating %d buffers (%g MB)...\n", m_uNumBuffers, 
-    ((float) m_uNumBuffers)*m_uBytesPerTransfer/1024/1024);
-  m_buffer.allocate(m_uNumBuffers, m_uBytesPerTransfer);
+  printf("\nDumper: Creating %d buffers (%g MB)...\n", uNumBuffers, 
+    ((float) uNumBuffers)*m_uBytesPerTransfer/1024/1024);
+  m_buffer.allocate(uNumBuffers, m_uBytesPerTransfer);
 
-  // Allocate space for thread handles
+  // Spawn the thread
   printf("Dumper: Creating 1 thread...\n");
-  //m_pThread = (pthread_t*) malloc(sizeof(pthread_t));
-
-  // Spawn the threads
   m_uNumReady = 0;
   unsigned int uFailed = 0;
   if (pthread_create(&m_thread, NULL, threadLoop, this) != 0 ) {
@@ -64,9 +62,6 @@ Dumper::~Dumper()
   for (unsigned int i=0; i<m_uNumReady; i++) {
     pthread_join(m_thread, NULL);
   }
-
-  // Free the thread pointer
-  //free(m_pThread);
   
   // Close file if still open
   closeFile();
@@ -105,31 +100,53 @@ bool Dumper::openFile(const std::string& sFilePath, const TimeKeeper& tk)
   printf("Dumper::openFile -- Creating: %s\n", sFilePath.c_str());
   
   if ((m_pFile = fopen(sFilePath.c_str(), "w")) == NULL) {
-    printf ("Error writing to data dump file.  Cannot write to: %s\n", sFilePath.c_str());
+    printf ("Error writing to data dump file.  Cannot write to: %s\n", 
+      sFilePath.c_str());
     return false;
   }
   
-  // Start file header with time stamp
-  int i = tk.year();
-  fwrite(&i, sizeof(tk.year()), 1, m_pFile);
-  i = tk.doy();
-  fwrite(&i, sizeof(tk.year()), 1, m_pFile);
-  i = tk.hh();
-  fwrite(&i, sizeof(tk.year()), 1, m_pFile);
-  i = tk.mm();
-  fwrite(&i, sizeof(tk.year()), 1, m_pFile);
-  i = tk.ss();
-  fwrite(&i, sizeof(tk.year()), 1, m_pFile);
-    
-  // Add sample typde information
-  fwrite(&m_uDataType, sizeof(m_uDataType), 1, m_pFile);
-    
-  // Add normalization info for data
-  fwrite(&m_dScale, sizeof(m_dScale), 1, m_pFile);
-  fwrite(&m_dOffset, sizeof(m_dOffset), 1, m_pFile);
+  unsigned int uHdrBytes = 0;
   
-  // Add total number of bytes to follow
-  fwrite(&m_uBytesPerAccumulation, sizeof(m_uBytesPerAccumulation), 1, m_pFile);
+  // Start file header with time stamp (4 bytes each)
+  int i = tk.year();
+  uHdrBytes += fwrite(&i, sizeof(i), 1, m_pFile) * sizeof(i);
+  
+  i = tk.doy();
+  uHdrBytes += fwrite(&i, sizeof(i), 1, m_pFile) * sizeof(i);
+  
+  i = tk.hh();
+  uHdrBytes += fwrite(&i, sizeof(i), 1, m_pFile) * sizeof(i);
+  
+  i = tk.mm();
+  uHdrBytes += fwrite(&i, sizeof(i), 1, m_pFile) * sizeof(i);
+  
+  i = tk.ss();
+  uHdrBytes += fwrite(&i, sizeof(i), 1, m_pFile) * sizeof(i);
+    
+  // Add sample type information (4 bytes)
+  uHdrBytes += fwrite(&m_uDataType, sizeof(m_uDataType), 1, m_pFile) 
+                * sizeof(m_uDataType);
+    
+  // Add sample normalization info (8 bytes each)
+  uHdrBytes += fwrite(&m_dScale, sizeof(m_dScale), 1, m_pFile) 
+                * sizeof(m_dScale);
+                
+  uHdrBytes += fwrite(&m_dOffset, sizeof(m_dOffset), 1, m_pFile) 
+                * sizeof(m_dOffset); 
+  
+  // Add sample rate (8 bytes)
+  uHdrBytes += fwrite(&m_dSampleRate, sizeof(m_dSampleRate), 1, m_pFile) 
+                * sizeof(m_dSampleRate);
+    
+  // Add total number of bytes to follow (8 bytes)
+  uHdrBytes += fwrite(&m_uBytesPerAccumulation, sizeof(m_uBytesPerAccumulation), 
+                      1, m_pFile) * sizeof(m_uBytesPerAccumulation);
+                      
+  // Expect header to be 56 bytes
+  if (uHdrBytes != 56) {
+    printf ("Error writing to header to dump file.\n");
+    return false;
+  }
     
   return true;
 }
