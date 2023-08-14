@@ -37,13 +37,17 @@ class Digitizer {
   public:
 
     enum DataType {
-      uint16 = 1,
-      int16 = 2,
-      uint32 = 3,
-      int32 = 4,
-      float16 = 5,
-      float32 = 6,
-      float64 = 7 
+      uint8 = 1,
+      int8 = 2,
+      uint16 = 3,
+      int16 = 4,
+      uint32 = 5,
+      int32 = 6,
+      uint64 = 7,
+      int64 = 8,
+      float16 = 9,
+      float32 = 10,
+      float64 = 11 
     };
     
     virtual bool                  acquire() = 0; 

@@ -76,18 +76,20 @@ class ByteBuffer {
 	  // the buffer and must be called before the buffer can be used.
 	  void allocate(unsigned int, unsigned int);
 
-	  // Get the iterator of the next available item
+	  // Get the iterator of the next available item as long as there at least
+	  // i[unsigned int] items available ahead of the current position.
 		bool request(ByteBuffer::iterator&, unsigned int);
 
 		// Returns false if there are fewer than uNumAvailable items available in 
 		// the list starting at iterator's current position
 		bool available(ByteBuffer::iterator&, unsigned int);
 
-	  // Safely increment the iterator to the next item. 
-	  // Returns false if no item available.
+	  // Safely increment the iterator to the next item.  Does not advance the
+	  // position recorder or mark a hold on the item.  Returns false if no item 
+	  // available.
 	  bool next(ByteBuffer::iterator&);
 
-	  // Release the iterator (each iterator acquired with 'get' must be released)
+	  // Release the iterator (each iterator acquired with 'request' must be released)
 	  void release(ByteBuffer::iterator&);
 
 	  // Returns pointer to the buffer block in the current item in the iterator

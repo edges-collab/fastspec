@@ -21,6 +21,7 @@ class Dumper {
     unsigned int                  m_uNumBuffers;
     unsigned int                  m_uNumReady;
     unsigned int                  m_uDataType;
+    double                        m_dSampleRate;
     double                        m_dScale;
     double                        m_dOffset;
     bool                          m_bStop;
@@ -36,6 +37,7 @@ class Dumper {
             unsigned int, 
             unsigned int, 
             unsigned int,  
+            double,
             double,
             double );
             

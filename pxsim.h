@@ -1,11 +1,6 @@
 #ifndef _PXSIM_H_
 #define _PXSIM_H_
 
-#include <cstdlib>
-#include <ctime>
-#include <functional>
-#include <math.h>
-#include <stdio.h> // printf
 #include <unistd.h> // usleep
 #include "digitizer.h"
 #include "timing.h"
@@ -28,39 +23,7 @@ unsigned long xorshf96() { //period 2^96-1
   return zr;
 }
 
-/*
-double rand_normal(float mean, float stddev)
-{   
-    //Box muller method
-    static float n2 = 0.0;
-    static int n2_cached = 0;
-    if (!n2_cached)
-    {
-        float x, y, r;
-        do
-        {
-            x = 2.0*rand()/RAND_MAX - 1;
-            y = 2.0*rand()/RAND_MAX - 1;
 
-            r = x*x + y*y;
-        }
-        while (r == 0.0 || r > 1.0);
-        
-        float d = sqrt(-2.0*log(r)/r);
-        float n1 = x*d;
-        n2 = y*d;
-        float result = n1*stddev + mean;
-        n2_cached = 1;
-        return result;
-        
-    }
-    else
-    {
-        n2_cached = 0;
-        return n2*stddev + mean;
-    }
-}
-*/
 
 // ---------------------------------------------------------------------------
 //
@@ -86,6 +49,7 @@ class PXSim : public Digitizer {
     double                      m_dCWFreq2;             // MHz
     double                      m_dCWAmp2;              // 0 to 1 
     double                      m_dNoiseAmp;            // 0 to 1  
+    double                      m_dVoltageOffset;
     unsigned long               m_uSamplesPerAccumulation; 
     unsigned int                m_uSamplesPerTransfer;
     SAMPLE_DATA_TYPE*           m_pBuffer; 
@@ -106,6 +70,7 @@ class PXSim : public Digitizer {
       m_dCWFreq2 = 0;
       m_dCWAmp2 = 0;   
       m_dNoiseAmp = 0;   
+      m_dVoltageOffset = 0;
       m_dScale =  1.0/32768;
       m_dOffset = -1.0;
       m_dAcquisitionRate = dAcquisitionRate;     // MS/s
@@ -129,7 +94,9 @@ class PXSim : public Digitizer {
 
       unsigned long uNumSamples = 0;
       Timer timer;
+      
       double dTransferTime = m_uSamplesPerTransfer / m_dAcquisitionRate / 1.0e6;
+      
       printf("Transfer time: %10.10f\n", dTransferTime);
 
       // Reset the stop flag
@@ -155,45 +122,46 @@ class PXSim : public Digitizer {
       // Loop over number of transfers requested
       unsigned long long uSampleIndex = 0;  
       unsigned long uRandom = 0;
-      unsigned short* pPointer = 0; // used to divide uRandom into 4 components
-      double cw[4];
-      double dCW1 = 2.0 * M_PI * m_dCWFreq1 / m_dAcquisitionRate;
-      double dCW2 = 2.0 * M_PI * m_dCWFreq2 / m_dAcquisitionRate;
-
+      unsigned short* pPointer = 0; // used to divide 64 bit uRandom into 4 x 16 bit components
+      float cw[4];     
+      float dCW1 = 2.0 * M_PI * m_dCWFreq1 / m_dAcquisitionRate;
+      float dCW2 = 2.0 * M_PI * m_dCWFreq2 / m_dAcquisitionRate;
+            
       while ((uNumSamples < m_uSamplesPerAccumulation) && !m_bStop) {
 
         // For each transfer, populate the buffer
         for (unsigned int i=0; i<m_uSamplesPerTransfer; i+=4) {
 
-          /*cw[0]=0;cw[1]=0;cw[2]=0;cw[3]=0;
-          for (double j=90.0+(0.001*m_counter); j<91; j+=0.1) {
-            cw[0] += m_dCWAmp1 * sin(dCW1*uSampleIndex*j/m_dCWFreq1);
-            cw[1] += m_dCWAmp1 * sin(dCW1*(uSampleIndex+1)*j/m_dCWFreq1);
-            cw[2] += m_dCWAmp1 * sin(dCW1*(uSampleIndex+2)*j/m_dCWFreq1);
-            cw[3] += m_dCWAmp1 * sin(dCW1*(uSampleIndex+3)*j/m_dCWFreq1);             
-          }
-          */
-
-          // Calculate four samples of two continuous waves
-          cw[0] = m_dCWAmp1 * sin(dCW1*uSampleIndex)     + m_dCWAmp2 * sin(dCW2*uSampleIndex);
-          cw[1] = m_dCWAmp1 * sin(dCW1*(uSampleIndex+1)) + m_dCWAmp2 * sin(dCW2*(uSampleIndex+1));
-          cw[2] = m_dCWAmp1 * sin(dCW1*(uSampleIndex+2)) + m_dCWAmp2 * sin(dCW2*(uSampleIndex+2));
-          cw[3] = m_dCWAmp1 * sin(dCW1*(uSampleIndex+3)) + m_dCWAmp2 * sin(dCW2*(uSampleIndex+3)); 
-          uSampleIndex +=4; 
-
-          // Calculate four samples of gaussian noise
+          // Calculate four voltage samples of two continuous waves
+          cw[0]  = m_dCWAmp1 * sin(dCW1 * uSampleIndex);
+          cw[0] += m_dCWAmp2 * sin(dCW2 * uSampleIndex++);
+          cw[1]  = m_dCWAmp1 * sin(dCW1 * uSampleIndex);
+          cw[1] += m_dCWAmp2 * sin(dCW2 * uSampleIndex++);
+          cw[2]  = m_dCWAmp1 * sin(dCW1 * uSampleIndex);
+          cw[2] += m_dCWAmp2 * sin(dCW2 * uSampleIndex++);
+          cw[3]  = m_dCWAmp1 * sin(dCW1 * uSampleIndex);
+          cw[3] += m_dCWAmp2 * sin(dCW2 * uSampleIndex++);
+          
+          // Add the noise and offset contributions to each voltage sample
           uRandom = xorshf96(); 
           pPointer = (unsigned short*) &uRandom;
-          m_pBuffer[i]   = 2.0 * m_dNoiseAmp * (pPointer[0] & 0x7FFF);
-          m_pBuffer[i+1] = 2.0 * m_dNoiseAmp * (pPointer[1] & 0x7FFF);
-          m_pBuffer[i+2] = 2.0 * m_dNoiseAmp * (pPointer[2] & 0x7FFF);
-          m_pBuffer[i+3] = 2.0 * m_dNoiseAmp * (pPointer[3] & 0x7FFF);
+          cw[0] += m_dNoiseAmp * (pPointer[0] / 32768.0 - 1) + m_dVoltageOffset;
+          cw[1] += m_dNoiseAmp * (pPointer[1] / 32768.0 - 1) + m_dVoltageOffset;
+          cw[2] += m_dNoiseAmp * (pPointer[2] / 32768.0 - 1) + m_dVoltageOffset;
+          cw[3] += m_dNoiseAmp * (pPointer[3] / 32768.0 - 1) + m_dVoltageOffset;
+                    
+          /// Convert from voltages to PX digitizer data units
+          cw[0] = (cw[0] - m_dOffset) / m_dScale;
+          cw[1] = (cw[1] - m_dOffset) / m_dScale;
+          cw[2] = (cw[2] - m_dOffset) / m_dScale;
+          cw[3] = (cw[3] - m_dOffset) / m_dScale;
           
-          // Add the contributions together
-          m_pBuffer[i]   += (1.0 - m_dNoiseAmp) * 32768.5 + 32768.0 * (cw[0]);
-          m_pBuffer[i+1] += (1.0 - m_dNoiseAmp) * 32768.5 + 32768.0 * (cw[1]);
-          m_pBuffer[i+2] += (1.0 - m_dNoiseAmp) * 32768.5 + 32768.0 * (cw[2]);
-          m_pBuffer[i+3] += (1.0 - m_dNoiseAmp) * 32768.5 + 32768.0 * (cw[3]);
+          // Store in buffer.  This implicitly casts to SAMPLE_DATA_TYPE
+          m_pBuffer[i] = cw[0];
+          m_pBuffer[i+1] = cw[1];
+          m_pBuffer[i+2] = cw[2];
+          m_pBuffer[i+3] = cw[3];
+          
         }
 
         // Wait until enough time has passed that the samples would have been 
@@ -202,8 +170,8 @@ class PXSim : public Digitizer {
             usleep( (dTransferTime - timer.get()) * 1e6 );
         }
 
-        printf("Actual transfer time: %8.6f, Desired transfer time: %8.6f, Diff: %8.6f\n", timer.get(), dTransferTime, (dTransferTime-timer.get())*1.0e6);
-
+        printf("Actual transfer time: %8.6f, Desired transfer time: %8.6f, Diff: %8.6f\n", 
+          timer.get(), dTransferTime, (dTransferTime-timer.get())*1.0e6);
 
         // Reset the timer
         timer.tic();
@@ -225,16 +193,19 @@ class PXSim : public Digitizer {
 
     void disconnect() { }
 
-    void setSignal(double dFreq1, double dAmp1, double dFreq2, double dAmp2, double dNoiseAmp) { 
+    void setSignal(double dFreq1, double dAmp1, double dFreq2, double dAmp2, double dNoiseAmp, double dVoltageOffset) { 
       m_dCWFreq1 = dFreq1; 
       m_dCWAmp1 = dAmp1;
       m_dCWFreq2 = dFreq2;
       m_dCWAmp2 = dAmp2;
       m_dNoiseAmp = dNoiseAmp;
+      m_dVoltageOffset = dVoltageOffset;
 
+      printf("PXSim: Digitized voltage simulation parameters:\n");
       printf("PXSim: Continuous wave 1: amplitude %g at %g MHz\n", m_dCWAmp1, m_dCWFreq1);
       printf("PXSim: Continuous wave 2: amplitude %g at %g MHz\n", m_dCWAmp2, m_dCWFreq2);
       printf("PXSim: Uniform (not Gaussian) noise: amplitude %g\n", m_dNoiseAmp);
+      printf("PXSim: Constant offset %g\n", m_dOffset);
     }
 
     void setCallback(DigitizerReceiver* pReceiver) { m_pReceiver = pReceiver; }

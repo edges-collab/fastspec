@@ -62,7 +62,9 @@ void print_help()
   printf("receiver switch states and acquires samples from an analog-to-digital\n");
   printf("converter (ADC) and sends them through a polyphase filter bank (PFB) for\n");
   printf("channelization.  Channelization is multi-threaded. Accumulated spectra\n");
-  printf("are stored to disk in an .acq file.\n\n");
+  printf("are stored to disk in an .acq file.  Raw samples from the antenna switch\n");
+  printf("state can be optionally stored directly to disk in a .dmp file, however\n");
+  printf("the data volume is very large (tpyically about 1 GB/s).\n\n");
 
   printf("FASTSPEC accepts many configuration settings, all of which are available\n");
   printf("through command line arguments and by using a .ini configuration file.\n");
@@ -87,14 +89,17 @@ void print_help()
   printf("               " DEFAULT_INI_FILE "\n\n");
 
   printf("FASTSPEC can also be called to control the behavior of an already running\n");
-  printf("instance.  Four commands are supported:\n\n");
+  printf("instance.  Six commands are supported:\n\n");
 
-  printf("hide      Send HIDE PLOTS signal to an already running FASTSPEC instance.\n");
-  printf("kill      Send 'kill -9' signal to an already running FASTSPEC instance.\n");  
-  printf("show      Send SHOW PLOTS signal to an already running FASTSPEC instance.\n");
-  printf("stop      Send STOP signal to an already running FASTSPEC instance.\n\n");
+  
+  printf("dump      Start dumping raw antenna samples to .dmp files.\n");
+  printf("nodump    Stop dumping raw antenna samples to .dmp files.\n"); 
+  printf("show      Show the live plotting window.\n");
+  printf("hide      Hide the live plotting window.\n");
+  printf("kill      Send the hard abort 'kill -9' signal to the already running instance.\n"); 
+  printf("stop      Send a soft stop signal to the already running instance.\n\n");
 
-  printf("FASTSPEC uses gnuplot for plotting ('-p', '--show_plots').  Gnuplot can be\n");
+  printf("FASTSPEC uses gnuplot for live plotting ('-p', '--show_plots').  Gnuplot can be\n");
   printf("installed using the system package manager, e.g. sudo apt-get install gnuplot.\n");
   printf("In addition to the built-in gnuplot commands, such as '+' and '-' to scale\n");
   printf("the plot, right clicking corners of a box to zoom, exporting to image files,\n");
@@ -174,10 +179,11 @@ int main(int argc, char* argv[])
       long uVoltageRange        = ctrl.getOptionInt("Spectrometer", "voltage_range", "-v", 0);
     #elif defined DIG_PXSIM
       double dCWFreq1         = ctrl.getOptionReal("Spectrometer", "sim_cw_freq1", "-F1", 75);
-      double dCWAmp1          = ctrl.getOptionReal("Spectrometer", "sim_cw_amp1", "-A1", 0.3);
-      double dCWFreq2         = ctrl.getOptionReal("Spectrometer", "sim_cw_freq2", "-F2", 40);
-      double dCWAmp2          = ctrl.getOptionReal("Spectrometer", "sim_cw_amp2", "-A2", 0.2);  
-      double dNoiseAmp        = ctrl.getOptionReal("Spectrometer", "sim_noise_amp", "-AN", 0.1);
+      double dCWAmp1          = ctrl.getOptionReal("Spectrometer", "sim_cw_amp1", "-A1", 0.03);
+      double dCWFreq2         = ctrl.getOptionReal("Spectrometer", "sim_cw_freq2", "-F2", 110);
+      double dCWAmp2          = ctrl.getOptionReal("Spectrometer", "sim_cw_amp2", "-A2", 0.02);  
+      double dNoiseAmp        = ctrl.getOptionReal("Spectrometer", "sim_noise_amp", "-AN", 0.5);
+      double dOffset          = ctrl.getOptionReal("Spectrometer", "sim_offset", "-AO", 0.0);
     #endif
     
     // Channelizer configuration
@@ -263,7 +269,7 @@ int main(int argc, char* argv[])
       PXSim dig( dAcquisitionRate, 
                  uSamplesPerAccum, 
                  uSamplesPerTransfer );
-      dig.setSignal(dCWFreq1, dCWAmp1, dCWFreq2, dCWAmp2, dNoiseAmp);
+      dig.setSignal(dCWFreq1, dCWAmp1, dCWFreq2, dCWAmp2, dNoiseAmp, dOffset);
     #endif
 
     // Connect to the digitizer board
@@ -289,6 +295,7 @@ int main(int argc, char* argv[])
                   uSamplesPerTransfer*dig.bytesPerSample(), 
                   uNumDumpBuffers,
                   dig.type(),
+                  dAcquisitionRate,
                   dig.scale(),
                   dig.offset() );
                
