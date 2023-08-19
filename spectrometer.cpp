@@ -197,7 +197,7 @@ void Spectrometer::run()
       // Start a fresh raw data dump if on antenna position and dump requested
       if (m_pController->dump() && i==0) {
         m_bDumpingThisCycle = true;
-        m_pDumper->openFile(m_pController->getDumpFilePath(tk), tk);
+        m_pDumper->openFile(m_pController->getDumpFilePath(tk), tk, i);
       }   
       
       // Acquire data
@@ -390,7 +390,9 @@ bool Spectrometer::writeToAcqFile() {
       printf("Spectrometer: Failed to write header to new .acq file.\n");
       return false;
     }
-    fs << "; FASTSPEC " << VERSION << std::endl;
+    fs << "; FASTSPEC v" << VERSION_MAJOR << "." 
+                         << VERSION_MINOR << "." 
+                         << VERSION_PATCH << std::endl;
     fs << m_pController->getConfigStr();
     fs.close();
   }

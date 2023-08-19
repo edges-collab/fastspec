@@ -2,7 +2,7 @@
 #include "dumper.h"
 #include "timing.h"
 #include "utility.h"
-
+#include "version.h"
 
 
 
@@ -82,7 +82,9 @@ double Dumper::getTimerInterval()
 // ----------------------------------------------------------------------------
 // openFile
 // ----------------------------------------------------------------------------
-bool Dumper::openFile(const std::string& sFilePath, const TimeKeeper& tk)
+bool Dumper::openFile( const std::string& sFilePath, 
+                       const TimeKeeper& tk,
+                       const unsigned int uSwitch )
 {
   // Clear anything left in the buffer if we didn't finish properly last time
   m_buffer.clear();
@@ -107,10 +109,20 @@ bool Dumper::openFile(const std::string& sFilePath, const TimeKeeper& tk)
   
   unsigned int uHdrBytes = 0;
   
-  // Start file header with time stamp (4 bytes each)
-  int i = tk.year();
+  // Start file header with the fastspec version (12 bytes total)
+  unsigned int i = VERSION_MAJOR; 
   uHdrBytes += fwrite(&i, sizeof(i), 1, m_pFile) * sizeof(i);
-  
+
+  i = VERSION_MINOR; 
+  uHdrBytes += fwrite(&i, sizeof(i), 1, m_pFile) * sizeof(i);
+
+  i = VERSION_PATCH; 
+  uHdrBytes += fwrite(&i, sizeof(i), 1, m_pFile) * sizeof(i);    
+
+  // Add the time stamp (4 bytes each, 20 bytes total)
+  i = tk.year();
+  uHdrBytes += fwrite(&i, sizeof(i), 1, m_pFile) * sizeof(i);
+
   i = tk.doy();
   uHdrBytes += fwrite(&i, sizeof(i), 1, m_pFile) * sizeof(i);
   
@@ -123,11 +135,15 @@ bool Dumper::openFile(const std::string& sFilePath, const TimeKeeper& tk)
   i = tk.ss();
   uHdrBytes += fwrite(&i, sizeof(i), 1, m_pFile) * sizeof(i);
     
+  // Add spectrometer switch state (4 bytes)
+  uHdrBytes += fwrite(&uSwitch, sizeof(uSwitch), 1, m_pFile) 
+                * sizeof(uSwitch);
+                
   // Add sample type information (4 bytes)
   uHdrBytes += fwrite(&m_uDataType, sizeof(m_uDataType), 1, m_pFile) 
                 * sizeof(m_uDataType);
     
-  // Add sample normalization info (8 bytes each)
+  // Add sample normalization info (8 bytes each, 16 bytes total)
   uHdrBytes += fwrite(&m_dScale, sizeof(m_dScale), 1, m_pFile) 
                 * sizeof(m_dScale);
                 
@@ -142,8 +158,8 @@ bool Dumper::openFile(const std::string& sFilePath, const TimeKeeper& tk)
   uHdrBytes += fwrite(&m_uBytesPerAccumulation, sizeof(m_uBytesPerAccumulation), 
                       1, m_pFile) * sizeof(m_uBytesPerAccumulation);
                       
-  // Expect header to be 56 bytes
-  if (uHdrBytes != 56) {
+  // Expect header to be 72 bytes
+  if (uHdrBytes != 72) {
     printf ("Error writing to header to dump file.\n");
     return false;
   }

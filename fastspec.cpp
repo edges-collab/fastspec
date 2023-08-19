@@ -53,9 +53,10 @@ void on_signal(int iSignalNumber) {
 // ----------------------------------------------------------------------------
 void print_help()
 {
+
   printf("\n");
   printf("| ------------------------------------------------------------------------\n");
-  printf("| FASTSPEC " VERSION " - HELP\n");
+  printf("| FASTSPEC v%d.%d.%d - HELP\n", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
   printf("| ------------------------------------------------------------------------\n\n");
 
   printf("FASTPEC is a spectrometer for the EDGES instrument.  It controls the\n");
@@ -121,7 +122,7 @@ int main(int argc, char* argv[])
 
     printf("\n");
     printf("| ------------------------------------------------------------------------\n");
-    printf("| FASTSPEC " VERSION "\n");
+    printf("| FASTSPEC v%d.%d.%d\n", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
     printf("| ------------------------------------------------------------------------\n");
     printf("\n");
 

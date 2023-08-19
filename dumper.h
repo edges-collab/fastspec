@@ -45,7 +45,9 @@ class Dumper {
     // Interface functions
     bool            push(void*, unsigned int);
     void            closeFile();
-    bool            openFile(const std::string&, const TimeKeeper&);
+    bool            openFile( const std::string&, 
+                              const TimeKeeper&, 
+                              const unsigned int );
     void            waitForEmpty();
     double          getTimerInterval();
     
