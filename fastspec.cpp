@@ -195,7 +195,7 @@ int main(int argc, char* argv[])
     long uNumBuffers          = ctrl.getOptionInt("Spectrometer", "num_fft_buffers", "-b", 400);
     
     // Raw data dumper configuration
-    long uNumDumpBuffers      = ctrl.getOptionInt("Spectrometer", "num_dump_buffers", "-b", 1000);
+    long uNumDumpBuffers      = ctrl.getOptionInt("Spectrometer", "num_dump_buffers", "-M", 1000);
     
     // Run configuration
     long uStopCycles          = ctrl.getOptionInt("Spectrometer", "stop_cycles", "-c", 0); 
