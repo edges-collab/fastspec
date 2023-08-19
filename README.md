@@ -73,6 +73,8 @@ Each heading (e.g. 'Spectrometer') provides the `.ini` section under which the o
 * `show --show`: 0
 * `hide --hide`: 0
 * `kill --kill`: 0
+* `dump --dump`: 0
+* `nodump --nodump`: 0
 * `-h --help`: 1
 * `-i --inifile`: `./fastspec.ini`
 
@@ -99,12 +101,14 @@ Each heading (e.g. 'Spectrometer') provides the `.ini` section under which the o
 * `-s --stop_seconds`: 
 * `-u --stop_time`: YYYY/MM/DDThh:mm:ss [UTC]
 * `-p --show_plots`: 0
-* `-B --plot_bin`: 1 
+* `-B --plot_bin`: 1
+* `-y --dump_raw_data`: 0 
 * `-F1 --sim_cw_freq1`: 75
 * `-A1 --sim_cw_amp1`: 0.03
 * `-F2 --sim_cw_freq2`: 40
 * `-A2 --sim_cw_amp2`: 0.02
 * `-AN --sim_noise_amp`: 0.001
+* `-AO --sim_offset`: 0.0
 
 Some key parameters are:
 
