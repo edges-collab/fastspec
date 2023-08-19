@@ -5,7 +5,7 @@
 
 
 // Implement here so we don't have to #include CsSdkMisc.h
-void DisplayErrorString(const int32 i32Status)
+void DisplayErrorString(const int i32Status)
 {
 	char	szErrorString[255];
 	CsGetErrorString(i32Status, szErrorString, 255);
@@ -107,7 +107,7 @@ bool RazorMax::connect(unsigned int uBoardNumber)
 {
   printf ("Connecting to and initializing RazorMax digitizer device...\n");
 
-  int32 iStatus = CS_SUCCESS;
+  int iStatus = CS_SUCCESS;
 
   // Initializes the CompuScope boards found in the system. If the
   // system is not found, a message with the error code will appear.
@@ -396,7 +396,7 @@ bool RazorMax::acquire()
   void *pPreviousBuffer = NULL;
   unsigned long uNumSamples = 0;
   unsigned long n = 0;
-  int32 iStatus = CS_SUCCESS;
+  int iStatus = CS_SUCCESS;
 
   unsigned int u32TransferTimeout = 5000;
   unsigned int u32ErrorFlag = 0;
