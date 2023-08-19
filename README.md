@@ -102,6 +102,7 @@ Each heading (e.g. 'Spectrometer') provides the `.ini` section under which the o
 * `-u --stop_time`: YYYY/MM/DDThh:mm:ss [UTC]
 * `-p --show_plots`: 0
 * `-B --plot_bin`: 1
+* `-M --num_dump_buffers`: 1000
 * `-y --dump_raw_data`: 0 
 * `-F1 --sim_cw_freq1`: 75
 * `-A1 --sim_cw_amp1`: 0.03
