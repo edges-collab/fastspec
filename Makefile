@@ -41,14 +41,18 @@ ifeq ($(switch), sim)
 	SW_HDRS := swsim.h
 	SW_LIBS :=
 	SW_DEFS := -DSW_SIM
-else ifeq ($(switch), parallelport)
-	SW_HDRS := swparallelport.h
+else ifeq ($(switch), gpio)
+	SW_HDRS := swgpio.h
 	SW_LIBS :=
-	SW_DEFS := -DSW_PARALLELPORT
+	SW_DEFS := -DSW_GPIO
 else ifeq ($(switch), mezio)
 	SW_HDRS := swneuosys.h
 	SW_LIBS := -lwdt_dio
 	SW_DEFS := -DSW_MEZIO
+else ifeq ($(switch), parallelport)
+	SW_HDRS := swparallelport.h
+	SW_LIBS :=
+	SW_DEFS := -DSW_PARALLELPORT
 else
 	# Cause an abort before building
 	ERROR_SWITCH := true
@@ -111,7 +115,7 @@ endif
 ifdef ERROR_SWITCH
 	# Abort with error message
 	$(error No switch method specified on make command line. Use make argument: \
-	  switch=[mezio, parallelport, sim])
+	  switch=[gpio, mezio, parallelport, sim])
 endif
 
 ifdef USE_DEFAULT_PRECISION

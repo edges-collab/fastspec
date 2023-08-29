@@ -13,7 +13,10 @@
 #endif
 
 // Handle the switch configuration compiler flags
-#if defined SW_MEZIO
+#if defined SW_GPIO
+  #include "swgpio.h"
+  #define SWITCH SWGpio
+#elif defined SW_MEZIO
   #include "swneuosys.h"
   #define SWITCH SWNeuosys
 #elif defined SW_PARALLELPORT
@@ -169,6 +172,13 @@ int main(int argc, char* argv[])
     // Switch configuration
     long uSwitchIOPort        = ctrl.getOptionInt("Spectrometer", "switch_io_port", "-o", 0x3010);
     double dSwitchDelay       = ctrl.getOptionReal("Spectrometer", "switch_delay", "-e", 0.5);
+   
+    #if defined SW_GPIO
+      string sSwitchGpioPath    = ctrl.getOptionStr("Spectrometer", "switch_gpio_path", "-gp", "");
+      long uSwitchGpio0         = ctrl.getOptionInt("Spectrometer", "switch_gpio_pin0", "-g0", 0); 
+      long uSwitchGpio1         = ctrl.getOptionInt("Spectrometer", "switch_gpio_pin1", "-g1", 0); 
+      long uSwitchGpio2         = ctrl.getOptionInt("Spectrometer", "switch_gpio_pin2", "-g2", 0);    
+    #endif
     
     // Digitizer configuration
     long uSamplesPerAccum     = ctrl.getOptionInt("Spectrometer", "samples_per_accumulation", "-a", 1024L*2L*1024L*1024L);
@@ -250,6 +260,17 @@ int main(int argc, char* argv[])
       printf("Failed to control receiver switch.  Abort.\n");
       return 1;
     }
+    
+    #if defined SW_GPIO
+      unsigned int uPins[3] = { (unsigned int) uSwitchGpio0, 
+                                (unsigned int) uSwitchGpio1, 
+                                (unsigned int) uSwitchGpio2 };
+      if (!sw.setPinMap(sSwitchGpioPath, uPins, 3)) {
+        printf("Failed to initialize receiver switch GPIO pins.  Abort.\n");
+        return 1;
+      }
+    #endif
+    
     sw.set(0);
 
     // -----------------------------------------------------------------------

@@ -69,12 +69,6 @@ class SWNeuosys : public Switch {
       return uSwitchState;
     }
 
-
-    unsigned int increment() {
-      return set((m_uSwitchState + 1) % 3);
-    }
-
-
     unsigned int get() { return m_uSwitchState; }
 
 };

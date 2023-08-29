@@ -14,7 +14,6 @@ class Switch {
 public: 
 
     virtual unsigned int set(unsigned int) = 0;
-    virtual unsigned int increment() = 0;
     virtual unsigned int get() = 0;
 
 };
