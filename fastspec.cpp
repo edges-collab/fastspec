@@ -15,13 +15,12 @@
 // Handle the switch configuration compiler flags
 #if defined SW_MEZIO
   #include "swneuosys.h"
-  #define SWITCH SWNeuosys
 #elif defined SW_PARALLELPORT
   #include "swparallelport.h"
-  #define SWITCH SWParallelPort
+#elif defined SW_TTY
+  #include "swtty.h"
 #elif defined SW_SIM
   #include "swsim.h"
-  #define SWITCH SWSim
 #elif
   #error Aborted in fastspec.cpp because switch flag not defined
 #endif
@@ -169,6 +168,11 @@ int main(int argc, char* argv[])
     // Switch configuration
     long uSwitchIOPort        = ctrl.getOptionInt("Spectrometer", "switch_io_port", "-o", 0x3010);
     double dSwitchDelay       = ctrl.getOptionReal("Spectrometer", "switch_delay", "-e", 0.5);
+    string sSwitchTTYPath     = ctrl.getOptionStr("Spectrometer", "switch_tty_path", "-t", "/dev/ttyACM0");
+    string sSwitchTTYInit     = ctrl.getOptionStr("Spectrometer", "switch_tty_init", "-t", "MEM,0;OOBSPDT,1;OOB,1;Noise,0;Atten,1;Hot,0");
+    string sSwitchTTYState0   = ctrl.getOptionStr("Spectrometer", "switch_tty_0", "-t", "MEM,0;Noise,0");
+    string sSwitchTTYState1   = ctrl.getOptionStr("Spectrometer", "switch_tty_1", "-t", "MEM,6;Noise,0");
+    string sSwitchTTYState2   = ctrl.getOptionStr("Spectrometer", "switch_tty_2", "-t", "MEM,6;Noise,1");
     
     // Digitizer configuration
     long uSamplesPerAccum     = ctrl.getOptionInt("Spectrometer", "samples_per_accumulation", "-a", 1024L*2L*1024L*1024L);
@@ -244,18 +248,37 @@ int main(int argc, char* argv[])
 
     // -----------------------------------------------------------------------
     // Initialize the receiver switch
-    // -----------------------------------------------------------------------   
-    SWITCH sw; 
-    if (!sw.init(uSwitchIOPort)) {
-      printf("Failed to control receiver switch.  Abort.\n");
-      return 1;
-    }
+    // -----------------------------------------------------------------------      
+    #if defined SW_MEZIO
+      SWNeuosys sw;
+      if (!sw.init(uSwitchIOPort)) {
+        printf("Failed to control MEZIO switch.  Abort.\n");
+        return 1;
+      }  
+    #elif defined SW_PARALLELPORT
+      SWParallelPort sw;
+      if (!sw.init(uSwitchIOPort)) {
+        printf("Failed to control parallel port switch.  Abort.\n");
+        return 1;
+      }      
+    #elif defined SW_TTY
+      SWTTY sw( sSwitchTTYPath, sSwitchTTYState0,
+                sSwitchTTYState1, sSwitchTTYState2 );
+      if (!sw.init(sSwitchTTYInit)) {
+        printf("Failed to control TTY switch.  Abort.\n");
+        return 1;
+      }
+    #elif defined SW_SIM
+      SWSim sw;
+    #endif
+
+    // Start off in state 0
     sw.set(0);
 
     // -----------------------------------------------------------------------
     // Initialize the digitizer board
-    // -----------------------------------------------------------------------       
-       
+    // -----------------------------------------------------------------------
+
     #if defined DIG_RAZORMAX
       RazorMax dig( dAcquisitionRate, 
                     uSamplesPerAccum, 
@@ -287,8 +310,8 @@ int main(int argc, char* argv[])
                uNumChannels, 
                uNumTaps, 
                uWindowFunctionId );
-               
-               
+
+
     // -----------------------------------------------------------------------
     // Initialize the asynchronous raw data dumper
     // -----------------------------------------------------------------------   
@@ -299,7 +322,7 @@ int main(int argc, char* argv[])
                   dAcquisitionRate,
                   dig.scale(),
                   dig.offset() );
-               
+
 
     // -----------------------------------------------------------------------
     // Initialize the Spectrometer

@@ -25,8 +25,6 @@ class SWSim : public Switch {
     
     ~SWSim() {}
 
-    bool init(unsigned int) { return true; }
-
     unsigned int set(unsigned int uSwitchState) {
       m_uSwitchState = uSwitchState;
       return uSwitchState;
