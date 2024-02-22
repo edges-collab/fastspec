@@ -15,13 +15,12 @@
 // Handle the switch configuration compiler flags
 #if defined SW_MEZIO
   #include "swneuosys.h"
-  #define SWITCH SWNeuosys
 #elif defined SW_PARALLELPORT
   #include "swparallelport.h"
-  #define SWITCH SWParallelPort
+#elif defined SW_TTY
+  #include "swtty.h"
 #elif defined SW_SIM
   #include "swsim.h"
-  #define SWITCH SWSim
 #elif
   #error Aborted in fastspec.cpp because switch flag not defined
 #endif
@@ -167,9 +166,17 @@ int main(int argc, char* argv[])
     string sUserOutput        = ctrl.getOptionStr("Spectrometer", "output_file", "-f", "");
     
     // Switch configuration
-    long uSwitchIOPort        = ctrl.getOptionInt("Spectrometer", "switch_io_port", "-o", 0x3010);
     double dSwitchDelay       = ctrl.getOptionReal("Spectrometer", "switch_delay", "-e", 0.5);
-    
+  #if defined SW_PARALLELPORT   
+    long uSwitchIOPort        = ctrl.getOptionInt("Spectrometer", "switch_io_port", "-o", 0x3010);
+  #elif defined SW_TTY
+    string sSwitchTTYPath     = ctrl.getOptionStr("Spectrometer", "switch_tty_path", "-TP", "/dev/ttyACM0");
+    string sSwitchTTYInit     = ctrl.getOptionStr("Spectrometer", "switch_tty_init", "-TIN", "MEM,0\nOOBSPDT,1\nOOB,1\nNoise,0\nAtten,1\nHot,0\n");
+    string sSwitchTTYState0   = ctrl.getOptionStr("Spectrometer", "switch_tty_0", "-T0", "MEM,0\nNoise,0\n");
+    string sSwitchTTYState1   = ctrl.getOptionStr("Spectrometer", "switch_tty_1", "-T1", "MEM,6\nNoise,0\n");
+    string sSwitchTTYState2   = ctrl.getOptionStr("Spectrometer", "switch_tty_2", "-T2", "MEM,6\nNoise,1\n");
+  #endif
+  
     // Digitizer configuration
     long uSamplesPerAccum     = ctrl.getOptionInt("Spectrometer", "samples_per_accumulation", "-a", 1024L*2L*1024L*1024L);
     long uSamplesPerTransfer  = ctrl.getOptionInt("Spectrometer", "samples_per_transfer", "-t", 2*1024*1024);
@@ -244,18 +251,37 @@ int main(int argc, char* argv[])
 
     // -----------------------------------------------------------------------
     // Initialize the receiver switch
-    // -----------------------------------------------------------------------   
-    SWITCH sw; 
-    if (!sw.init(uSwitchIOPort)) {
-      printf("Failed to control receiver switch.  Abort.\n");
-      return 1;
-    }
+    // -----------------------------------------------------------------------      
+    #if defined SW_MEZIO
+      SWNeuosys sw;
+      if (!sw.init(uSwitchIOPort)) {
+        printf("Failed to control MEZIO switch.  Abort.\n");
+        return 1;
+      }  
+    #elif defined SW_PARALLELPORT
+      SWParallelPort sw;
+      if (!sw.init(uSwitchIOPort)) {
+        printf("Failed to control parallel port switch.  Abort.\n");
+        return 1;
+      }      
+    #elif defined SW_TTY
+      SWTTY sw( sSwitchTTYPath, sSwitchTTYState0,
+                sSwitchTTYState1, sSwitchTTYState2 );
+      if (!sw.init(sSwitchTTYInit)) {
+        printf("Failed to control TTY switch.  Abort.\n");
+        return 1;
+      }
+    #elif defined SW_SIM
+      SWSim sw;
+    #endif
+
+    // Start off in state 0
     sw.set(0);
 
     // -----------------------------------------------------------------------
     // Initialize the digitizer board
-    // -----------------------------------------------------------------------       
-       
+    // -----------------------------------------------------------------------
+
     #if defined DIG_RAZORMAX
       RazorMax dig( dAcquisitionRate, 
                     uSamplesPerAccum, 
@@ -287,8 +313,8 @@ int main(int argc, char* argv[])
                uNumChannels, 
                uNumTaps, 
                uWindowFunctionId );
-               
-               
+
+
     // -----------------------------------------------------------------------
     // Initialize the asynchronous raw data dumper
     // -----------------------------------------------------------------------   
@@ -299,7 +325,7 @@ int main(int argc, char* argv[])
                   dAcquisitionRate,
                   dig.scale(),
                   dig.offset() );
-               
+
 
     // -----------------------------------------------------------------------
     // Initialize the Spectrometer

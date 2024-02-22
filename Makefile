@@ -45,6 +45,10 @@ else ifeq ($(switch), parallelport)
 	SW_HDRS := swparallelport.h
 	SW_LIBS :=
 	SW_DEFS := -DSW_PARALLELPORT
+else ifeq ($(switch), tty)
+	SW_HDRS := swtty.h
+	SW_LIBS :=
+	SW_DEFS := -DSW_TTY
 else ifeq ($(switch), mezio)
 	SW_HDRS := swneuosys.h
 	SW_LIBS := -lwdt_dio

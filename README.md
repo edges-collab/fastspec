@@ -35,8 +35,9 @@ Supported digitizer flags are:
 Supported switch flags are:
 
 * `mezio` - Requires `wdt_dio` to be installed and uses the MezIO system.
-* `parallelport` - Uses the parallel port.
+* `parallelport` - Uses the parallel port specified in the runtime configuration.
 * `sim` - Dummy switch that has no effect on any hardware.  Helpful for testing other aspects of the code.
+* `tty` - Uses the TTY device and command strings specified in the runtime configuration.  
 
 Fastspec supports two build-time floating point precision options for the FFT used in the polyphase filter bank: single (32 bit) and double (64 bit).  These can be set with precision flags:
 
