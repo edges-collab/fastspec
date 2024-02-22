@@ -166,14 +166,17 @@ int main(int argc, char* argv[])
     string sUserOutput        = ctrl.getOptionStr("Spectrometer", "output_file", "-f", "");
     
     // Switch configuration
-    long uSwitchIOPort        = ctrl.getOptionInt("Spectrometer", "switch_io_port", "-o", 0x3010);
     double dSwitchDelay       = ctrl.getOptionReal("Spectrometer", "switch_delay", "-e", 0.5);
-    string sSwitchTTYPath     = ctrl.getOptionStr("Spectrometer", "switch_tty_path", "-t", "/dev/ttyACM0");
-    string sSwitchTTYInit     = ctrl.getOptionStr("Spectrometer", "switch_tty_init", "-t", "MEM,0;OOBSPDT,1;OOB,1;Noise,0;Atten,1;Hot,0");
-    string sSwitchTTYState0   = ctrl.getOptionStr("Spectrometer", "switch_tty_0", "-t", "MEM,0;Noise,0");
-    string sSwitchTTYState1   = ctrl.getOptionStr("Spectrometer", "switch_tty_1", "-t", "MEM,6;Noise,0");
-    string sSwitchTTYState2   = ctrl.getOptionStr("Spectrometer", "switch_tty_2", "-t", "MEM,6;Noise,1");
-    
+  #if defined SW_PARALLELPORT   
+    long uSwitchIOPort        = ctrl.getOptionInt("Spectrometer", "switch_io_port", "-o", 0x3010);
+  #elif defined SW_TTY
+    string sSwitchTTYPath     = ctrl.getOptionStr("Spectrometer", "switch_tty_path", "-TP", "/dev/ttyACM0");
+    string sSwitchTTYInit     = ctrl.getOptionStr("Spectrometer", "switch_tty_init", "-TIN", "MEM,0\nOOBSPDT,1\nOOB,1\nNoise,0\nAtten,1\nHot,0\n");
+    string sSwitchTTYState0   = ctrl.getOptionStr("Spectrometer", "switch_tty_0", "-T0", "MEM,0\nNoise,0\n");
+    string sSwitchTTYState1   = ctrl.getOptionStr("Spectrometer", "switch_tty_1", "-T1", "MEM,6\nNoise,0\n");
+    string sSwitchTTYState2   = ctrl.getOptionStr("Spectrometer", "switch_tty_2", "-T2", "MEM,6\nNoise,1\n");
+  #endif
+  
     // Digitizer configuration
     long uSamplesPerAccum     = ctrl.getOptionInt("Spectrometer", "samples_per_accumulation", "-a", 1024L*2L*1024L*1024L);
     long uSamplesPerTransfer  = ctrl.getOptionInt("Spectrometer", "samples_per_transfer", "-t", 2*1024*1024);
