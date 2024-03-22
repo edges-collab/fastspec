@@ -23,9 +23,9 @@ using namespace std;
 
 
 // For 3-pos switch, the config is:
-// CC1-1 + CC1-4 = 17V (p0 - ant)
-// CC1-2 + CC1-4 = 20V (p1 - amb)
-// CC1-3 + CC1-4 = 24V (p2 - hot)
+// CC1-1 + CC1-4 = 17.3V (p0 - ant)
+// CC1-2 + CC1-4 = 19.9V (p1 - amb)
+// CC1-3 + CC1-4 = 24.1V (p2 - hot)
 // xxxx CC1-4 only = ??
 
 // See labjack U3 manual, section 5.2.2 and 5.2.3 for packet info
