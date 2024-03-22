@@ -16,6 +16,8 @@ Prior to building, ensure the following dependencies are installed on the system
 * `CsE16bcd` - Only needed for digitizer=raxormax.  Must compile from driver source code.  The current supported version (as of July 2023) includes Ubuntu 20.04 LTS.  See additional installation notes below.
 * `wdt_dio` - Only needed for switch=mezio.  Provides interface to the MezIO system.
 * `gnuplot-qt` - (Optional) Provides GUI for displaying live spectra plots.
+* `exodriver` - Only needed for switch=labjack.  Provides interface to LabJack.  Download and build using git clone https://github.com/labjack/exodriver.git
+* `libusb-1.0-0-dev` - Only needed for switch=labjack.  
 
 ### Supported Digitizer Boards
 * `PX14400` - use make flag: digitizer=pxboard
@@ -34,6 +36,7 @@ Supported digitizer flags are:
 
 Supported switch flags are:
 
+* `labjack` - Requires `exodriver` and `libusb-1.0-0-dev` to be isntalled.  Assumed a single LabJack U3 is connected and its digital IO ports E1, E3, E5, and EIO7 are used to control an EDGES Control Circuit (CC1) board. 
 * `mezio` - Requires `wdt_dio` to be installed and uses the MezIO system.
 * `parallelport` - Uses the parallel port specified in the runtime configuration.
 * `sim` - Dummy switch that has no effect on any hardware.  Helpful for testing other aspects of the code.
