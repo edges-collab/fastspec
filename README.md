@@ -30,7 +30,7 @@ $ make digitizer=<flag> switch=<flag> precision=<flag>
 ```
 Supported digitizer flags are:
 
-* `pxboard` - Requires the `sig_px14400` driver and px14.h header file to be installed (see EDGES Google Shared Drive for final driver source code)
+* `pxboard` - Requires the `sig_px14400` driver and px14.h header file to be installed.  Drivers can be downloaded from Vitrek (https://vitrek.com/signatec/support/downloads-2/) or the EDGES Google Drive.  See also our repositoriy at https://github.com/edges-collab/px14400_patch for updates to the drivers for more recent Linux kernels.
 * `pxsim` - No required drivers.  Gnerates a mock digitizer data stream.  No physical digitizer is used.  Helpful for testing other aspects of the code. (very slow)
 * `razormax` - Requires the Gage Linux SDK/dirver and associated header files to be installed (see EDGES Google Shared driver for latest driver source code)
 
