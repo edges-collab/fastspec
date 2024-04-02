@@ -12,7 +12,7 @@ Prior to building, ensure the following dependencies are installed on the system
 
 * `fftw3f-dev` - Only needed for Ubuntu 18.04 LTS or lower.  Provides single precision FFT.
 * `fftw3-dev` - Provides double-precision FFT.  For Ubuntu 20.04 LTS and later it also provides single precision FFT.
-* `sig_px14400` - Only needed for digitizer=pxboard.  Must be compiled from driver source code.  The last supported version of the driver includes Ubuntu 18.04 LTS.  
+* `sig_px14400` - Only needed for digitizer=pxboard.  Must be compiled from driver source code.  Drivers can be downloaded from Vitrek (https://vitrek.com/signatec/support/downloads-2/) or the EDGES Google Drive.  The latest released driver supports Ubuntu 16.04 LTS through Ubuntu 19.10.  See also our repositoriy at https://github.com/edges-collab/px14400_patch for updates to the drivers for more recent Linux kernels.
 * `CsE16bcd` - Only needed for digitizer=raxormax.  Must compile from driver source code.  The current supported version (as of July 2023) includes Ubuntu 20.04 LTS.  See additional installation notes below.
 * `wdt_dio` - Only needed for switch=mezio.  Provides interface to the MezIO system.
 * `gnuplot-qt` - (Optional) Provides GUI for displaying live spectra plots.
@@ -30,7 +30,7 @@ $ make digitizer=<flag> switch=<flag> precision=<flag>
 ```
 Supported digitizer flags are:
 
-* `pxboard` - Requires the `sig_px14400` driver and px14.h header file to be installed.  Drivers can be downloaded from Vitrek (https://vitrek.com/signatec/support/downloads-2/) or the EDGES Google Drive.  See also our repositoriy at https://github.com/edges-collab/px14400_patch for updates to the drivers for more recent Linux kernels.
+* `pxboard` - Requires the `sig_px14400` driver and px14.h header file to be installed (see dependencies above).
 * `pxsim` - No required drivers.  Gnerates a mock digitizer data stream.  No physical digitizer is used.  Helpful for testing other aspects of the code. (very slow)
 * `razormax` - Requires the Gage Linux SDK/dirver and associated header files to be installed (see EDGES Google Shared driver for latest driver source code)
 
