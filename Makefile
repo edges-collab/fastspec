@@ -53,6 +53,10 @@ else ifeq ($(switch), mezio)
 	SW_HDRS := swneuosys.h
 	SW_LIBS := -lwdt_dio
 	SW_DEFS := -DSW_MEZIO
+else ifeq ($(switch), labjack)
+	SW_HDRS := swlabjack.h
+	SW_LIBS := -llabjackusb
+	SW_DEFS := -DSW_LABJACK
 else
 	# Cause an abort before building
 	ERROR_SWITCH := true

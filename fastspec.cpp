@@ -19,6 +19,8 @@
   #include "swparallelport.h"
 #elif defined SW_TTY
   #include "swtty.h"
+#elif defined SW_LABJACK
+  #include "swlabjack.h"
 #elif defined SW_SIM
   #include "swsim.h"
 #elif
@@ -269,6 +271,12 @@ int main(int argc, char* argv[])
                 sSwitchTTYState1, sSwitchTTYState2 );
       if (!sw.init(sSwitchTTYInit)) {
         printf("Failed to control TTY switch.  Abort.\n");
+        return 1;
+      }
+    #elif defined SW_LABJACK
+      SWLabJack sw;
+      if (!sw.init()) {
+				printf("Failed to control Labjack switch.  Abort.\n");
         return 1;
       }
     #elif defined SW_SIM
