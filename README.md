@@ -165,7 +165,7 @@ To install the driver for the RazorMax digitizer on Ubuntu 20.04 LTS, follow the
 - Note: If you want to try this manually for debugging, the $(TARGET) = CsE16bcd.ko
 5. Run the gage install script:
   ```
-  $ ./gagesc install -c hexagon -ad
+  $ ./gagesc.sh install -c hexagon -ad
   ```
 - Note: During installation, modprobe will report failure if the Razormax card isn't installed in the computer.  It will only load the module if the card is present.
 6. After build succeeds, copy the public include files to /usr/local/include/gage so fastspec can easily find them
