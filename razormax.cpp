@@ -1,15 +1,22 @@
 #include "razormax.h"
-//#include "CsSdkMisc.h" // DisplayErrorString
-//#include "CsExpert.h" // USER_MODE
 
+// ----------------------------------------------------------------------------
+// The Gage SDK library headers have complicated dependencies which make it
+// difficult to use with external software.  To avoid them, we'll implement a 
+// few things there.
+// ----------------------------------------------------------------------------
 
+// Values needed to enable the eXpert data streaming mode (from CsExpert.h)
+#define CS_BBOPTIONS_STREAM   0x2000
+#define CS_MODE_USER1         0x40000000
+#define CS_MODE_USER2         0x80000000
 
-// Implement here so we don't have to #include CsSdkMisc.h
+// Show error strings (from CsSdkMisc.h)
 void DisplayErrorString(const int i32Status)
 {
-	char	szErrorString[255];
+	char	szErrorString[256];
 	CsGetErrorString(i32Status, szErrorString, 255);
-	printf("\n%s\n", szErrorString);
+	printf("\nRazormax driver error: %s\n", szErrorString);
 }
 
 
@@ -173,11 +180,10 @@ bool RazorMax::connect(unsigned int uBoardNumber)
   // mode).  See ACQUISITION_MODES in CsDefines.h
   csAcquisitionCfg.u32Mode = CS_MODE_SINGLE;  
 
-  /*
   // (must #include CsExpert.h)
   // Check if selected system supports Expert Stream and set the correct 
   // firmware image to be used.
-  int64 i64ExtendedOptions = 0;
+  long i64ExtendedOptions = 0;
   iStatus = CsGet(m_hBoard, CS_PARAMS, CS_EXTENDED_BOARD_OPTIONS, &i64ExtendedOptions);
   if (CS_FAILED(iStatus))
   {
@@ -203,7 +209,6 @@ bool RazorMax::connect(unsigned int uBoardNumber)
     disconnect();
     return false;
   }
-  */
 
   // Set the acquisition rate
   csAcquisitionCfg.i64SampleRate = m_uAcquisitionRate;
