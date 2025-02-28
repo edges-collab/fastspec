@@ -44,7 +44,7 @@ class Buffer {
 
 			// Member variables
 			BUFFER_DATA_TYPE*		  pData;
-			unsigned int 				uHolds;
+			unsigned int 				  uHolds;
 	};
 
 	// Nested class for the external iterator exposed by the buffer.
@@ -107,7 +107,6 @@ class Buffer {
 	  // Push data into the buffer.  Returns false if buffer is full.
 	  bool push(SAMPLE_DATA_TYPE*, unsigned int, double, double);
 	  
-
 	  // Returns number of holds on items currently in buffer
 	  unsigned int holds();
 

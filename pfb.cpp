@@ -13,7 +13,7 @@
 // ----------------------------------------------------------------------------
 PFB::PFB( unsigned int uNumThreads, unsigned int uNumBuffers, 
           unsigned int uNumChannels, unsigned int uNumTaps, 
-          unsigned int uWindow )
+          unsigned int uWindow, bool bReturnInOrder)
 {
   m_uNumTaps = uNumTaps;
   m_uNumThreads = uNumThreads;
@@ -23,6 +23,7 @@ PFB::PFB( unsigned int uNumThreads, unsigned int uNumBuffers,
   m_uNumSamples = m_uNumTaps*m_uNumFFT;
   m_pReceiver = NULL;
   m_bStop = false;
+  m_bReturnInOrder = bReturnInOrder;
 
   // Allocate space for window function
   m_pWindow = NULL;
@@ -328,9 +329,13 @@ void PFB::process( Buffer::iterator& iter, FFT_REAL_TYPE* pLocal1,
   if (m_pReceiver == NULL) {
     printf("ERROR: PFB process has no callback function assigned!\n");
   } else {
-    pthread_mutex_lock(&m_mutexCallback);
-    m_pReceiver->onChannelizerData(&sData);
-    pthread_mutex_unlock(&m_mutexCallback);
+  
+    
+      pthread_mutex_lock(&m_mutexCallback);
+      m_pReceiver->onChannelizerData(&sData);
+      pthread_mutex_unlock(&m_mutexCallback);
+    
+    
   }
 
 } // process()
