@@ -7,6 +7,9 @@
 
 
 
+#define THREAD_SLEEP_MICROSECONDS 5
+
+
 
 // ----------------------------------------------------------------------------
 // Constructor
@@ -247,7 +250,6 @@ void* PFB::threadLoop(void* pContext)
 }
 
 
-
 // ----------------------------------------------------------------------------
 // process -- Handle a buffer of data
 // ----------------------------------------------------------------------------
@@ -261,8 +263,10 @@ void PFB::process( Buffer::iterator& iter, FFT_REAL_TYPE* pLocal1,
   BUFFER_DATA_TYPE* pWin = m_pWindow;
   BUFFER_DATA_TYPE dMax = 0;
   BUFFER_DATA_TYPE dMin = 0;
-  Buffer::iterator iterStart = iter;
+  //Buffer::iterator iterStart = iter;
 
+  //printf("PFB::Process: Starting...\n");
+  
   // Loop over taps of data
   for (t=0; t<m_uNumTaps; t++) {
 
@@ -331,15 +335,22 @@ void PFB::process( Buffer::iterator& iter, FFT_REAL_TYPE* pLocal1,
     printf("ERROR: PFB process has no callback function assigned!\n");
   } else {
 
+    // printf("PFB::Process: Ready to return result (in order: %d, oldest: %d...\n", m_bReturnInOrder, m_buffer.oldest(iterStart));
+   /*   
 		// Wait until it is our turn (only if we're returning in order)
-		while (m_bReturnInOrder && !m_buffer.oldest(iter)) {
+		while (m_bReturnInOrder && !m_buffer.oldest(iterStart)) {
 	    // Sleep before trying again
 	    usleep(THREAD_SLEEP_MICROSECONDS);			
 		}
-		    
+		*/ 
+		
+		//printf("PFB::Process: Calling receiver...\n");
+		
     pthread_mutex_lock(&m_mutexCallback);
     m_pReceiver->onChannelizerData(&sData);
     pthread_mutex_unlock(&m_mutexCallback);
+    
+    //printf("PFB::Process: Done with chunk.\n");
 
   }
 

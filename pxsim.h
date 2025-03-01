@@ -97,7 +97,7 @@ class PXSim : public Digitizer {
       
       double dTransferTime = m_uSamplesPerTransfer / m_dAcquisitionRate / 1.0e6;
       
-      printf("Transfer time: %10.10f\n", dTransferTime);
+      // printf("PXSim: Desired transfer time=%10.10f\n", dTransferTime);
 
       // Reset the stop flag
       m_bStop = false;
@@ -129,6 +129,8 @@ class PXSim : public Digitizer {
             
       while ((uNumSamples < m_uSamplesPerAccumulation) && !m_bStop) {
 
+        // printf("PXSim: uNumSamples= %lu of %lu\n", uNumSamples, m_uSamplesPerAccumulation);
+        
         // For each transfer, populate the buffer
         for (unsigned int i=0; i<m_uSamplesPerTransfer; i+=4) {
 
@@ -170,9 +172,11 @@ class PXSim : public Digitizer {
             usleep( (dTransferTime - timer.get()) * 1e6 );
         }
 
-        printf("Actual transfer time: %8.6f, Desired transfer time: %8.6f, Diff: %8.6f\n", 
-          timer.get(), dTransferTime, (dTransferTime-timer.get())*1.0e6);
-
+        if (uNumSamples == 0) {
+          printf("Actual transfer time: %8.6f, Desired transfer time: %8.6f, Diff: %8.6f\n", 
+            timer.get(), dTransferTime, (dTransferTime-timer.get())*1.0e6);
+        }
+        
         // Reset the timer
         timer.tic();
 

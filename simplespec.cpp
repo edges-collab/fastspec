@@ -259,10 +259,12 @@ int main(int argc, char* argv[])
     // -----------------------------------------------------------------------
     // Initialize the Spectrometer
     // -----------------------------------------------------------------------
+    unsigned long uSpectraPerAccum = 1 + (uSamplesPerAccum - uNumTaps*uNumFFT) / uNumFFT;
     SpectrometerSimple spec( uNumChannels, 
                        uSamplesPerAccum, 
                        dBandwidth,
                        uNumAccumulators,
+                       uSpectraPerAccum,
                        (Digitizer*) &dig,
                        (Channelizer*) &chan,
                        &ctrl );

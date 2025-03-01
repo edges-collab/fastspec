@@ -64,11 +64,10 @@ class SpectrometerSimple : public DigitizerReceiver, ChannelizerReceiver {
     // Private helper functions
     std::string 		getFileName();
     bool 						handleLivePlot();
-    bool 						isAbort();
     bool 						isStop(unsigned long, Timer&);
 		void 						threadIsReady();
     void 						waitForDone();
-    bool 						writeToAcqFile();
+    bool 						writeToFile(Accumulator*);
         
     Accumulator* 		activateAccumulator();
     void 						releaseAccumulator();    
@@ -79,7 +78,7 @@ class SpectrometerSimple : public DigitizerReceiver, ChannelizerReceiver {
   public:
 
     // Constructor and destructor
-    SpectrometerSimple( unsigned long, unsigned long, double, unsigned int,
+    SpectrometerSimple( unsigned long, unsigned long, double, unsigned int, unsigned long,
                   Digitizer*, Channelizer*, Controller*);
     ~SpectrometerSimple();
 

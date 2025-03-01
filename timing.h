@@ -100,6 +100,7 @@ class TimeKeeper {
     int     m_iHour;
     int     m_iMinutes;
     int     m_iSeconds;
+    long    m_iNanoSeconds;
     double  m_dSecondsSince1970;
 
   public:
@@ -107,7 +108,7 @@ class TimeKeeper {
     // Constructor and destructor
     TimeKeeper() : m_iYear(1970), m_iDayOfYear(1), 
                     m_iHour(0), m_iMinutes(0), m_iSeconds(0), 
-                    m_dSecondsSince1970(0) { }
+                    m_iNanoSeconds(0), m_dSecondsSince1970(0) { }
     
     ~TimeKeeper() { }
 
@@ -155,7 +156,7 @@ class TimeKeeper {
       return m_dSecondsSince1970;
     }
 
-
+/*
     // Set with the current system time
     double setNow() {
 
@@ -173,16 +174,34 @@ class TimeKeeper {
 
       return m_dSecondsSince1970;
     }
+*/  
 
-    int year() const { return m_iYear;}
+     // Set with the current system time
+    double setNow() {
+
+      struct timespec t;
+      clock_gettime(CLOCK_REALTIME, &t);
+      
+      m_dSecondsSince1970 = 0.0 + t.tv_sec + t.tv_nsec/1e9;
+      m_iNanoSeconds = t.tv_nsec;
+
+      getDateTimeFromSecondsSince1970(t.tv_sec, &m_iYear, &m_iDayOfYear, &m_iHour, &m_iMinutes, &m_iSeconds);
+
+      return m_dSecondsSince1970;
+    }   
+   
+
+    int year() const { return m_iYear; }
     
-    int doy() const { return m_iDayOfYear;}
+    int doy() const { return m_iDayOfYear; }
     
-    int hh() const { return m_iHour;}
+    int hh() const { return m_iHour; }
 
-    int mm() const { return m_iMinutes;}
+    int mm() const { return m_iMinutes; }
 
-    int ss() const { return m_iSeconds;}
+    int ss() const { return m_iSeconds; }
+    
+    int ns() const { return m_iNanoSeconds; }
 
     double secondsSince1970() const { return m_dSecondsSince1970; }
 
@@ -274,10 +293,14 @@ class TimeKeeper {
         sprintf(txt, "%04d_%03d_%02d_%02d", m_iYear, m_iDayOfYear, m_iHour, 
                 m_iMinutes);
         break;
-      default:
+      case 5:
         sprintf(txt, "%04d_%03d_%02d_%02d_%02d", m_iYear, m_iDayOfYear, m_iHour, 
                 m_iMinutes, m_iSeconds);
         break;
+      default:
+        sprintf(txt, "%04d_%03d_%02d_%02d_%02d_%03ld", m_iYear, m_iDayOfYear, m_iHour, 
+                m_iMinutes, m_iSeconds, m_iNanoSeconds / 1000000);
+        break;        
       }
       
       return std::string(txt);
@@ -305,9 +328,14 @@ class TimeKeeper {
         sprintf(txt, "%04d-%03d %02d:%02d", m_iYear, m_iDayOfYear, m_iHour, 
                 m_iMinutes);
         break;
-      default:
+      case 5:
         sprintf(txt, "%04d-%03d %02d:%02d:%02d", m_iYear, m_iDayOfYear, m_iHour, 
                 m_iMinutes, m_iSeconds);
+        break;
+      default:
+        sprintf(txt, "%04d-%03d %02d:%02d:%02d.%03ld", m_iYear, m_iDayOfYear, m_iHour, 
+                m_iMinutes, m_iSeconds, m_iNanoSeconds / 1000000);
+        break;        
       }
       
       return std::string(txt);

@@ -30,9 +30,6 @@
   #error Aborted in pfb.h because FFT precision was not defined.
 #endif
 
-
-#define THREAD_SLEEP_MICROSECONDS 5
-
 using namespace std;
 
 class PFB : public Channelizer {

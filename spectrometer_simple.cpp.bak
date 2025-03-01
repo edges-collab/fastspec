@@ -25,7 +25,7 @@ SpectrometerSimple::SpectrometerSimple(unsigned long uNumChannels,
                                        unsigned long uNumSamplesPerAccumulation, 
                                        double dBandwidth,
                                        unsigned int uNumAccumulators,
-                                       unsigned long uNumSpectraPerAccumulation,                                       
+                                       unisigned long uNumSpectraPerAccumulation,                                       
                                        Digitizer* pDigitizer,
                                        Channelizer* pChannelizer,
                                        Controller* pController )
@@ -45,7 +45,7 @@ SpectrometerSimple::SpectrometerSimple(unsigned long uNumChannels,
   m_dChannelFactor = 2; // because of Blackmann Harris 
   m_uNumFFT = 2*m_uNumChannels;
   
-  m_uNumSpectraPerAccumulation = uNumSpectraPerAccumulation;  
+  m_uNumSpectraPerAccumulation = uNumSamplesPerAccumulation;  
 //  m_uNumSpectraPerAccumulation = m_uNumSamplesPerAccumulation / m_uNumFFT;
 
 	printf("Spectrometer: Number of spectra per accumulation: %lu\n", m_uNumSpectraPerAccumulation);
@@ -173,6 +173,7 @@ void SpectrometerSimple::run()
   Timer writeTimer;
   Timer plotTimer;
   TimeKeeper tk;
+  double dDutyCycle_Overall;
   unsigned long uCycleDrops = 0;
   unsigned long uCycle = 0;
 
@@ -188,7 +189,6 @@ void SpectrometerSimple::run()
   while (!isStop(uCycle, totalRunTimer)) {
 
     uCycle++;
-    uCycleDrops = 0;
     dutyCycleTimer.tic();
     tk.setNow();
 
@@ -196,7 +196,7 @@ void SpectrometerSimple::run()
     printf("Spectrometer: Starting cycle %lu at %s\n", uCycle, tk.getDateTimeString(5).c_str());
     printf("Spectrometer: Total run time so far: %.02f seconds (%.3g days)\n", 
       totalRunTimer.toc(), totalRunTimer.toc()/3600.0/24);   
-    //printf("Spectrometer: m_write.size: %ld, m_active.size: %ld, m_released.size: %ld\n", m_write.size(), m_active.size(), m_released.size());
+    printf("Spectrometer: m_write.size: %ld, m_active.size: %ld, m_released.size: %ld\n", m_write.size(), m_active.size(), m_released.size());
     printf("----------------------------------------------------------------------\n");
                   
     Accumulator* pAccum = activateAccumulator();
@@ -215,30 +215,8 @@ void SpectrometerSimple::run()
       // Note the stop time
       pAccum->setStopTime();
       
-      // Wait for all the samples to be channelized
-      m_pChannelizer->waitForEmpty();
-    
-      // Normalize ADCmin and ADCmax:  we divide adcmin and adcmax by 2 here to  
-      // be backwards compatible with pxspec.  This limits adcmin and adcmax to 
-      // +/- 0.5 rather than +/-1.0
-      pAccum->setADCmin(pAccum->getADCmin()/2);
-      pAccum->setADCmax(pAccum->getADCmax()/2);   
-         
-      printf("Spectrometer: Duty cycle = %6.3f\n", 1.0 * m_uNumSamplesPerAccumulation / (2.0 * 1e6 * m_dBandwidth) / dutyCycleTimer.toc());
-      if (uCycleDrops > 0)
-      {	
-        printf("Spectrometer: Drop fraction = " RED "%6.3f\n" RESET, 1.0 * uCycleDrops / (m_uNumSamplesPerAccumulation + uCycleDrops));
-      } else {
-        printf("Spectrometer: Drop fraction = %6.3f\n", 1.0 * uCycleDrops / (m_uNumSamplesPerAccumulation + uCycleDrops));
-      }     
-      printf("Spectrometer: acdmin = %6.3f,  adcmax = %6.3f\n", pAccum->getADCmin(), pAccum->getADCmax());
-      printf("\n");
-    
-      // Write the accumulation (asynchronously)
-      transferAccumulatorToWriteQueue();
-      
   	} else {
-  	  printf("Spectrometer: ERROR - Failed to activate accumulator. Aborting.\n");
+  	  printf("Spectrometer: ERROR - Failed to get accumulator. Aborting.\n");
   	  sendStop();
   	}
   }
@@ -404,9 +382,8 @@ void SpectrometerSimple::waitForDone()
 bool SpectrometerSimple::writeToFile(Accumulator* pAccum) {
 
   std::string sFilePath = m_pController->getAcqFilePath(pAccum->getStartTime());
-  sFilePath.replace(sFilePath.length()-3, 3, "ssp");
-  
-  // Write the data
+
+  // Write the .acq entry
   printf("Spectrometer: Writing accumulations to file: %s\n", sFilePath.c_str());
 
   // If needed, start a new file and write the header
@@ -420,24 +397,15 @@ bool SpectrometerSimple::writeToFile(Accumulator* pAccum) {
       return false;
     }
     fs << "; SIMPLESPEC v" << VERSION_MAJOR << "." 
-                           << VERSION_MINOR << "." 
-                           << VERSION_PATCH << std::endl;
+                         << VERSION_MINOR << "." 
+                         << VERSION_PATCH << std::endl;
     fs << m_pController->getConfigStr();
-    fs << ";+++BEGIN_DATA_HEADER" << std::endl;
-    fs << ";--data_type_size: " << sizeof(ACCUM_DATA_TYPE) << std::endl;
-    fs << ";--num_channels: " << pAccum->getDataLength() << std::endl;  
-    fs << ";--start_frequency: " << pAccum->getStartFreq() << " MHz" << std::endl;
-    fs << ";--stop_frequency: " << pAccum->getStopFreq() << " MHz" << std::endl;
-    
-    double dStepFreq = (pAccum->getStopFreq() - pAccum->getStartFreq()) / (double) pAccum->getDataLength();
-    fs << ";--step_frequency: " << dStepFreq << " MHz" << std::endl;    
-    fs << ";+++END_DATA_HEADER" << std::endl;
-    
     fs.close();
   }
 
   // Write the data
-  return append_accumulation_simple( sFilePath,  pAccum );
+  //return append_accumulation( sFilePath, 
+  //                            m_accum1 );
 
   return true;
 }
@@ -461,7 +429,7 @@ unsigned long SpectrometerSimple::onDigitizerData( SAMPLE_DATA_TYPE* pBuffer,
   unsigned int uIndex = 0;
   unsigned int uAdded = 0;
     
-  // printf("Spectrometer: OnDigitizerData\n");
+  printf("Spectrometer: OnDigitizerData\n");
   
   // Loop over the transferred data and enter it into the channelizer buffer
   while ( ((uIndex + m_uNumFFT) <= uBufferLength) 
@@ -499,6 +467,38 @@ unsigned long SpectrometerSimple::onDigitizerData( SAMPLE_DATA_TYPE* pBuffer,
 void SpectrometerSimple::onChannelizerData(ChannelizerData* pData) 
 {  
 	m_active.front()->add(pData->pData, pData->uNumChannels, pData->dADCmin, pData->dADCmax);
+	
+	printf("NumAccums: %u\n", m_active.front()->getNumAccums());
+	
+	// Check if we've filled the accumulation
+  if (m_active.front()->getNumAccums() == m_uNumSpectraPerAccumulation)
+  {
+    printf("!!! here\n");
+    Accumulator* pAccum = m_active.front();
+     
+    // Normalize ADCmin and ADCmax:  we divide adcmin and adcmax by 2 here to  
+    // be backwards compatible with pxspec.  This limits adcmin and adcmax to 
+    // +/- 0.5 rather than +/-1.0
+    pAccum->setADCmin(pAccum->getADCmin()/2);
+    pAccum->setADCmax(pAccum->getADCmax()/2);
+     
+    /*
+    if (uCycleDrops > 0)
+    {	
+      printf("Spectrometer: Drop fraction          = " RED "%6.3f\n" RESET, 1.0 * uCycleDrops / (m_uNumSamplesPerAccumulation + uCycleDrops));
+    } else {
+      printf("Spectrometer: Drop fraction          = %6.3f\n", 1.0 * uCycleDrops / (m_uNumSamplesPerAccumulation + uCycleDrops));
+    }
+    */
+    printf("Spectrometer: acdmin = %6.3f,  adcmax = %6.3f\n", pAccum->getADCmin(), pAccum->getADCmax());
+    printf("\n");
+    
+    
+    // Write the accumulation
+  	transferAccumulatorToWriteQueue();
+  	  	
+  }
+  
 } // onChannelizerData()
 
 

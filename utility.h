@@ -55,6 +55,8 @@ std::string construct_filepath_base(const std::string&,
 
 bool append_switch_cycle( const std::string&, Accumulator&, Accumulator&, 
                           Accumulator& );
+                          
+bool append_accumulation_simple( const std::string&, Accumulator* );
 
 bool append_switch_pos( const char*, const ACCUM_DATA_TYPE*, unsigned int,  
                         unsigned int, unsigned int, unsigned int, unsigned int, 
