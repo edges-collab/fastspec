@@ -42,9 +42,14 @@ class Buffer {
 			// Destructor
 			~item() {}
 
+			// Operators
+			bool operator==(const Buffer::item& rhs) const {
+				return (pData == rhs.pData && uHolds == rhs.uHolds);
+			}
+			
 			// Member variables
 			BUFFER_DATA_TYPE*		  pData;
-			unsigned int 				  uHolds;
+			unsigned int 					uHolds;
 	};
 
 	// Nested class for the external iterator exposed by the buffer.
@@ -95,7 +100,7 @@ class Buffer {
 	  // Returns false if no item available.
 	  bool next(Buffer::iterator&);
 
-	  // Release the iterator (each iterator acquired with 'get' must be released)
+	  // Release the iterator (each iterator acquired with 'request' must be released)
 	  void release(Buffer::iterator&);
 
 	  // Returns pointer to the buffer block in the current item in the iterator
@@ -118,6 +123,9 @@ class Buffer {
 
 	  // Empties the buffer
 	  void clear();
+	  
+	  // Returns true if the specified iterator is the oldest in the buffer
+	  bool oldest(const Buffer::iterator&);
 	
 	private:
 

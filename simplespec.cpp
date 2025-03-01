@@ -1,5 +1,5 @@
 
-#define DEFAULT_INI_FILE "./fastspec.ini"
+#define DEFAULT_INI_FILE "./simplespec.ini"
 
 // Handle the digitizer configuration compiler flags
 #if defined DIG_RAZORMAX
@@ -15,7 +15,7 @@
 
 #include "pfb.h"
 #include "dumper.h"
-#include "spectrometer.h"
+#include "spectrometer_simple.h"
 #include "utility.h"
 #include "controller.h"
 #include "version.h"
@@ -152,6 +152,7 @@ int main(int argc, char* argv[])
     // Digitizer configuration
     long uSamplesPerAccum     = ctrl.getOptionInt("Spectrometer", "samples_per_accumulation", "-a", 1024L*2L*1024L*1024L);
     long uSamplesPerTransfer  = ctrl.getOptionInt("Spectrometer", "samples_per_transfer", "-t", 2*1024*1024);
+    long uNumAccumulators		  = ctrl.getOptionInt("Spectrometer", "num_accumulators", "-o", 32);
     double dAcquisitionRate   = ctrl.getOptionInt("Spectrometer", "acquisition_rate", "-r", 400);
     
     #if defined DIG_PXBOARD    
@@ -179,7 +180,7 @@ int main(int argc, char* argv[])
     string sStopTime          = ctrl.getOptionStr("Spectrometer", "stop_time", "-u", "");
     bool bPlot                = ctrl.getOptionBool("Spectrometer", "show_plots", "-p", false);    
     long uPlotBin             = ctrl.getOptionInt("Spectrometer", "plot_bin", "-B", 1);  
-    bool bDump                = ctrl.getOptionBool("Spectrometer", "dump_raw_data", "-y", false); 
+   // bool bDump                = ctrl.getOptionBool("Spectrometer", "dump_raw_data", "-y", false); 
 
 
     // Handle help flag if set (do this after parsing configuration so that the
@@ -260,8 +261,8 @@ int main(int argc, char* argv[])
     // -----------------------------------------------------------------------
     SpectrometerSimple spec( uNumChannels, 
                        uSamplesPerAccum, 
-                       dBandwidth, 
-                       dSwitchDelay,
+                       dBandwidth,
+                       uNumAccumulators,
                        (Digitizer*) &dig,
                        (Channelizer*) &chan,
                        &ctrl );

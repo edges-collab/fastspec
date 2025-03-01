@@ -272,6 +272,21 @@ void Buffer::cleanup() {
 }
 
 
+// ----------------------------------------------------------------------------
+// cleanup
+// ----------------------------------------------------------------------------
+// Returns true if the specified iterator is the oldest in the buffer
+bool Buffer::oldest(const Buffer::iterator& iter) {
+
+	if (iter.pBuffer != this)
+		return false;
+		
+
+	return ((*iter.it) == m_full.front());
+	
+}
+
+
 
 // ----------------------------------------------------------------------------
 // push

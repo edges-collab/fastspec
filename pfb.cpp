@@ -261,6 +261,7 @@ void PFB::process( Buffer::iterator& iter, FFT_REAL_TYPE* pLocal1,
   BUFFER_DATA_TYPE* pWin = m_pWindow;
   BUFFER_DATA_TYPE dMax = 0;
   BUFFER_DATA_TYPE dMin = 0;
+  Buffer::iterator iterStart = iter;
 
   // Loop over taps of data
   for (t=0; t<m_uNumTaps; t++) {
@@ -329,13 +330,17 @@ void PFB::process( Buffer::iterator& iter, FFT_REAL_TYPE* pLocal1,
   if (m_pReceiver == NULL) {
     printf("ERROR: PFB process has no callback function assigned!\n");
   } else {
-  
-    
-      pthread_mutex_lock(&m_mutexCallback);
-      m_pReceiver->onChannelizerData(&sData);
-      pthread_mutex_unlock(&m_mutexCallback);
-    
-    
+
+		// Wait until it is our turn (only if we're returning in order)
+		while (m_bReturnInOrder && !m_buffer.oldest(iter)) {
+	    // Sleep before trying again
+	    usleep(THREAD_SLEEP_MICROSECONDS);			
+		}
+		    
+    pthread_mutex_lock(&m_mutexCallback);
+    m_pReceiver->onChannelizerData(&sData);
+    pthread_mutex_unlock(&m_mutexCallback);
+
   }
 
 } // process()

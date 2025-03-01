@@ -8,7 +8,6 @@
 #include "channelizer.h"
 #include "dumper.h"
 #include "controller.h"
-#include "switch.h"
 #include "timing.h"
 
 #ifndef SAMPLE_DATA_TYPE
@@ -19,7 +18,7 @@
 //
 // SPECTROMETER_SIMPLE
 //
-// Uses PXBoard, Switch, and FFTPool objects to control and acquire data from
+// Uses PXBoard and FFTPool objects to control and acquire data from
 // the EDGES system.
 //
 // ---------------------------------------------------------------------------
@@ -32,15 +31,19 @@ class SpectrometerSimple : public DigitizerReceiver, ChannelizerReceiver {
     Channelizer*    m_pChannelizer;
     Controller*     m_pController;    
     
-		pthread_mutex_t   	m_queueMutex;    
-		pthread_mutex_t   	m_fileMutex;    
+    pthread_t 					m_thread;
+		pthread_mutex_t   	m_mutex;    
     list<Accumulator*>	m_released;
 		list<Accumulator*>	m_active;
+		list<Accumulator*>	m_write;
 		
     Accumulator*    m_pCurrentAccum;
     unsigned long   m_uNumFFT;
     unsigned long   m_uNumChannels;
     unsigned long   m_uNumSamplesPerAccumulation;
+    unsigned long		m_uNumSpectraPerAccumulation;
+    unsigned int		m_uNumAccumulators;
+    unsigned int		m_uNumMinFreeAccumulators;
     double          m_dAccumulationTime;        // seconds
     double          m_dBandwidth;               // MHz
     double          m_dChannelSize;             // MHz
@@ -48,6 +51,8 @@ class SpectrometerSimple : public DigitizerReceiver, ChannelizerReceiver {
     double          m_dStartFreq;               // MHz
     double          m_dStopFreq;                // MHz
     bool            m_bLocalStop;
+    bool						m_bThreadIsReady;
+    bool						m_bThreadStop;
     bool            m_bUseStopCycles;
     bool            m_bUseStopSeconds;
     bool            m_bUseStopTime;
@@ -57,20 +62,24 @@ class SpectrometerSimple : public DigitizerReceiver, ChannelizerReceiver {
 
 
     // Private helper functions
-    std::string getFileName();
-    bool writeToAcqFile();
-    bool handleLivePlot();
-    bool isStop(unsigned long, Timer&);
-    bool isAbort();
-    void allocateAccumulators(unsigned int);
-    Accummulator* activateAccumulator();
-    void releaseAccumulator();
-  
+    std::string 		getFileName();
+    bool 						handleLivePlot();
+    bool 						isAbort();
+    bool 						isStop(unsigned long, Timer&);
+		void 						threadIsReady();
+    void 						waitForDone();
+    bool 						writeToAcqFile();
+        
+    Accumulator* 		activateAccumulator();
+    void 						releaseAccumulator();    
+    Accumulator* 		transferAccumulatorToWriteQueue();
+    
+     
 
   public:
 
     // Constructor and destructor
-    SpectrometerSimple( unsigned long, unsigned long, double, 
+    SpectrometerSimple( unsigned long, unsigned long, double, unsigned int,
                   Digitizer*, Channelizer*, Controller*);
     ~SpectrometerSimple();
 
@@ -85,6 +94,8 @@ class SpectrometerSimple : public DigitizerReceiver, ChannelizerReceiver {
     // Callbacks
     unsigned long onDigitizerData(SAMPLE_DATA_TYPE*, unsigned int, unsigned long, double, double);
     void onChannelizerData(ChannelizerData*);
+    
+    static void*    threadLoop(void*);
 
 };
 
