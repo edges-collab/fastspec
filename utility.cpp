@@ -263,7 +263,7 @@ bool append_accumulation_simple( const string& sFilePath, Accumulator* pAccum  )
   //ft = (float) pAccum->getStartFreq();
   //fwrite(&ft, sizeof(ft), 1, file);
   //ft = (float) pAccum->getStopFreq();
-  fwrite(&ft, sizeof(ft), 1, file);  
+  //fwrite(&ft, sizeof(ft), 1, file);  
   uit = pAccum->getNumAccums();
   fwrite(&uit, sizeof(uit), 1, file);  
   ult = pAccum->getDrops();
