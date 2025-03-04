@@ -19,6 +19,7 @@ class Timer {
 
     struct timespec     m_tic;
     double              m_dInterval;  // seconds
+    bool                m_bRunning;
  
   public:
 
@@ -35,38 +36,39 @@ class Timer {
       m_tic.tv_sec = 0; 
       m_tic.tv_nsec = 0; 
       m_dInterval = 0; 
+      m_bRunning = false;
     }      
     
     // Return the interval
     double get() const { return m_dInterval; }
 
-
+    bool running() const { return m_bRunning; }
+    
     // Start the timer
     void tic() { 
       clock_gettime(CLOCK_MONOTONIC, &m_tic);
-      m_dInterval = 0; } 
+      m_dInterval = 0; 
+      m_bRunning = true;
+    } 
 
 
     // Record the difference between now and tic().  Updates each time it is
     // called, always comparing to the original tic() time.
     double toc() { 
 
-      struct timespec toc;
-      clock_gettime(CLOCK_MONOTONIC, &toc); 
-        
-      // Calculate the difference between tic and toc in seconds
-      m_dInterval = (toc.tv_sec - m_tic.tv_sec) + (toc.tv_nsec - m_tic.tv_nsec) / 1e9; 
-      
-      // If there was no tic before our toc, throw it out
-      if (m_dInterval < 0) {
-        m_dInterval = 0;
-      }      
+      if (m_bRunning) {
+        struct timespec toc;
+        clock_gettime(CLOCK_MONOTONIC, &toc); 
+          
+        // Calculate the difference between tic and toc in seconds
+        m_dInterval = (toc.tv_sec - m_tic.tv_sec) + (toc.tv_nsec - m_tic.tv_nsec) / 1e9; 
+      }
 
       return m_dInterval;
     }
       
       
-    // Record the difference between now and tic.  Only updates if toc()
+    // Record the difference between now and tic.  Only updates if toc() or 
     // toc_if_first() hasn't already been called.  Subsequent calls to toc()
     // will overwrite this interval, but subsequent calls to toc_if_first()
     // will not.

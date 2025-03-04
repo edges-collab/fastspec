@@ -59,11 +59,12 @@ class SpectrometerSimple : public DigitizerReceiver, ChannelizerReceiver {
     unsigned long   m_uStopCycles;
     double          m_dStopSeconds;             // Seconds
     TimeKeeper      m_tkStopTime;               // UTC
+    Timer           m_plotTimer;
 
 
     // Private helper functions
     std::string 		getFileName();
-    bool 						handleLivePlot();
+    bool 						handleLivePlot(Accumulator*);
     bool 						isStop(unsigned long, Timer&);
 		void 						threadIsReady();
     void 						waitForDone();

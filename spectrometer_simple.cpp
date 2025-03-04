@@ -5,6 +5,7 @@
 #include <unistd.h> // usleep
 
 #define SPEC_SLEEP_MICROSECONDS 5
+#define SPEC_PLOT_SECONDS 10
 
 // Terminal font colors
 #define RED   "\x1B[31m"
@@ -104,6 +105,8 @@ SpectrometerSimple::SpectrometerSimple(unsigned long uNumChannels,
     usleep(10000);
   }
   printf("Spectrometer: Thread is ready after %.3g seconds\n", tr.toc());
+  
+  
 
 } // constructor
 
@@ -256,6 +259,39 @@ void SpectrometerSimple::run()
 
 } // run()
 
+// ----------------------------------------------------------------------------
+// handleLivePlot() - Handle output for live plotting if needed
+// ----------------------------------------------------------------------------
+bool SpectrometerSimple::handleLivePlot(Accumulator* pAccum) {
+
+  // Should we be plotting?
+  if (!m_pController->plot()) {
+  
+    // If not, make sure the timer is stopped
+    m_plotTimer.reset();
+    return false;
+  }
+
+  // Plot if the controller just told us to start or if we've passed the
+  // update interval
+  if (!m_plotTimer.running() || (m_plotTimer.toc() > SPEC_PLOT_SECONDS)) {
+      
+    // Restart the plot timer
+    m_plotTimer.tic();
+    
+    // Write the temporary file for plotting
+    if (!write_plot_file( m_pController->getPlotFilePath(), 
+                          *pAccum, *pAccum, *pAccum,
+                          m_pController->getPlotBinLevel())) {
+      return false;
+    }
+    
+    // Tell the plotter to refresh
+    m_pController->updatePlotter();
+  }
+  
+  return true;
+}
 
 // ----------------------------------------------------------------------------
 // isStop() 
@@ -364,6 +400,9 @@ void* SpectrometerSimple::threadLoop(void* pContext)
 		
 			// Write to disk (creates new file/path if needed)
 			pSpec->writeToFile(pAccum);
+			
+			// Write live plot file needed
+			pSpec->handleLivePlot(pAccum);
 				
 		  // Release the accumulator back into waiting queue
 		  pSpec->releaseAccumulator();
@@ -433,13 +472,11 @@ bool SpectrometerSimple::writeToFile(Accumulator* pAccum) {
     fs << ";--step_frequency: " << dStepFreq << " MHz" << std::endl;    
     fs << ";+++END_DATA_HEADER" << std::endl;
     
-    fs.close();
+    fs.close();    
   }
 
   // Write the data
   return append_accumulation_simple( sFilePath,  pAccum );
-
-  return true;
 }
 
 
