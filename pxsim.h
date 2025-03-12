@@ -120,7 +120,7 @@ class PXSim : public Digitizer {
       timer.tic();
 
       // Loop over number of transfers requested
-      unsigned long long uSampleIndex = 0;  
+      double uSampleIndex = 0;  
       unsigned long uRandom = 0;
       unsigned short* pPointer = 0; // used to divide 64 bit uRandom into 4 x 16 bit components
       float cw[4];     
@@ -133,7 +133,7 @@ class PXSim : public Digitizer {
         
         // For each transfer, populate the buffer
         for (unsigned int i=0; i<m_uSamplesPerTransfer; i+=4) {
-
+          
           // Calculate four voltage samples of two continuous waves
           cw[0]  = m_dCWAmp1 * sin(dCW1 * uSampleIndex);
           cw[0] += m_dCWAmp2 * sin(dCW2 * uSampleIndex++);
