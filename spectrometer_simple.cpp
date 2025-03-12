@@ -42,7 +42,7 @@ SpectrometerSimple::SpectrometerSimple(unsigned long uNumChannels,
 
   // Derived configuration
   m_dChannelSize = m_dBandwidth / (double) m_uNumChannels; // MHz
-  m_dAccumulationTime = (double) uNumSamplesPerAccumulation / (m_dBandwidth * 1e6); // seconds
+  m_dAccumulationTime = (double) uNumSamplesPerAccumulation / (m_dBandwidth * 1e6) / 2.0; // seconds
   m_dStartFreq = 0.0;
   m_dStopFreq = m_dBandwidth;
   m_dChannelFactor = 2; // because of Blackmann Harris 
