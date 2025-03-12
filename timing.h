@@ -131,6 +131,10 @@ class TimeKeeper {
     friend bool operator<=(const TimeKeeper& lhs, const TimeKeeper& rhs) { return !(lhs > rhs); }
     friend bool operator>=(const TimeKeeper& lhs, const TimeKeeper& rhs) { return !(lhs < rhs); }
     friend bool operator!=(const TimeKeeper& lhs, const TimeKeeper& rhs) { return !(lhs == rhs); }
+    friend double operator-(const TimeKeeper& lhs, const TimeKeeper& rhs) 
+    { 
+      return (lhs.m_dSecondsSince1970 - rhs.m_dSecondsSince1970); 
+    }
 
 
     // Public functions

@@ -127,7 +127,7 @@ class PXSim : public Digitizer {
       float dCW1 = 2.0 * M_PI * m_dCWFreq1 / m_dAcquisitionRate;
       float dCW2 = 2.0 * M_PI * m_dCWFreq2 / m_dAcquisitionRate;
             
-      while ((uNumSamples < m_uSamplesPerAccumulation) && !m_bStop) {
+      while (!m_bStop) {
 
         // printf("PXSim: uNumSamples= %lu of %lu\n", uNumSamples, m_uSamplesPerAccumulation);
         
@@ -183,6 +183,15 @@ class PXSim : public Digitizer {
         // Call the callback function to process the chunk of data
         uNumSamples += m_pReceiver->onDigitizerData(m_pBuffer, m_uSamplesPerTransfer, uNumSamples, m_dScale, m_dOffset);
 
+        // Check if we need to the stop the loop.  Only stop if we've reached the 
+        // the number of desired samples.  If the accumulation size is zero, we 
+        // will run continuously and only stop by an external trigger, never on 
+        // our own.    
+        if ((m_uSamplesPerAccumulation > 0) && (m_uSamplesPerAccumulation <= uNumSamples))
+        {
+          stop();
+        }
+    
       } // transfer loop
 
       return true;

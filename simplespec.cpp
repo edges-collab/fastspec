@@ -179,7 +179,8 @@ int main(int argc, char* argv[])
     double dStopSeconds       = ctrl.getOptionReal("Spectrometer", "stop_seconds", "-s", 0);
     string sStopTime          = ctrl.getOptionStr("Spectrometer", "stop_time", "-u", "");
     bool bPlot                = ctrl.getOptionBool("Spectrometer", "show_plots", "-p", false);    
-    long uPlotBin             = ctrl.getOptionInt("Spectrometer", "plot_bin", "-B", 1);  
+    long uPlotBin             = ctrl.getOptionInt("Spectrometer", "plot_bin", "-B", 1);    
+    long uPlotInterval        = ctrl.getOptionInt("Spectrometer", "plot_interval_seconds", "-e", 10);  
    // bool bDump                = ctrl.getOptionBool("Spectrometer", "dump_raw_data", "-y", false); 
 
 
@@ -225,17 +226,17 @@ int main(int argc, char* argv[])
 
     #if defined DIG_RAZORMAX
       RazorMax dig( dAcquisitionRate, 
-                    uSamplesPerAccum, 
+                    0, // for continuous sampling
                     uSamplesPerTransfer ); 
     #elif defined DIG_PXBOARD
       PXBoard dig( dAcquisitionRate, 
-                   uSamplesPerAccum, 
+                   0, // for continuous sampling
                    uSamplesPerTransfer, 
                    uInputChannel, 
                    uVoltageRange );
     #elif defined DIG_PXSIM
       PXSim dig( dAcquisitionRate, 
-                 uSamplesPerAccum, 
+                 0, // for continuous sampling
                  uSamplesPerTransfer );
       dig.setSignal(dCWFreq1, dCWAmp1, dCWFreq2, dCWAmp2, dNoiseAmp, dOffset);
     #endif
@@ -254,27 +255,26 @@ int main(int argc, char* argv[])
                uNumChannels, 
                uNumTaps, 
                uWindowFunctionId,
-               true );
+               true );  // return in order
 
     // -----------------------------------------------------------------------
     // Initialize the Spectrometer
     // -----------------------------------------------------------------------
-    unsigned long uSpectraPerAccum = 1 + (uSamplesPerAccum - uNumTaps*uNumFFT) / uNumFFT;
     SpectrometerSimple spec( uNumChannels, 
-                       uSamplesPerAccum, 
-                       dBandwidth,
-                       uNumAccumulators,
-                       uSpectraPerAccum,
-                       (Digitizer*) &dig,
-                       (Channelizer*) &chan,
-                       &ctrl );
+                             uSamplesPerAccum, 
+                             dBandwidth,
+                             uNumAccumulators,
+                             (double) uPlotInterval,
+                             (Digitizer*) &dig,
+                             (Channelizer*) &chan,
+                             &ctrl );
 
     if (uStopCycles > 0) { spec.setStopCycles(uStopCycles); }
     if (dStopSeconds > 0) { spec.setStopSeconds(dStopSeconds); }
     if (!sStopTime.empty()) { spec.setStopTime(sStopTime); }
 
     // -----------------------------------------------------------------------
-    // Take data until the controller tell us it is time to stop
+    // Take data until the controller tells us it is time to stop
     // (usually when a SIGINT is received)
     // -----------------------------------------------------------------------    
     spec.run();

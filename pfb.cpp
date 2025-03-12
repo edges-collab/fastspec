@@ -263,12 +263,18 @@ void PFB::process( Buffer::iterator& iter, FFT_REAL_TYPE* pLocal1,
   BUFFER_DATA_TYPE* pWin = m_pWindow;
   BUFFER_DATA_TYPE dMax = 0;
   BUFFER_DATA_TYPE dMin = 0;
-  //Buffer::iterator iterStart = iter;
-
+  
+  // Make a copy of the head of the iterator for use later if we're in 
+  // release-in-order mode;
+  Buffer::iterator iterStart;
+  m_buffer.copy(iter, iterStart);
+  
   //printf("PFB::Process: Starting...\n");
   
   // Loop over taps of data
   for (t=0; t<m_uNumTaps; t++) {
+
+    //printf("PFB: Tap item index=%llu\n", m_buffer.index(iter));
 
     // Get the current buffer block and window block
     pIn = m_buffer.data(iter);
@@ -335,22 +341,27 @@ void PFB::process( Buffer::iterator& iter, FFT_REAL_TYPE* pLocal1,
     printf("ERROR: PFB process has no callback function assigned!\n");
   } else {
 
-    // printf("PFB::Process: Ready to return result (in order: %d, oldest: %d...\n", m_bReturnInOrder, m_buffer.oldest(iterStart));
-   /*   
-		// Wait until it is our turn (only if we're returning in order)
-		while (m_bReturnInOrder && !m_buffer.oldest(iterStart)) {
-	    // Sleep before trying again
-	    usleep(THREAD_SLEEP_MICROSECONDS);			
-		}
-		*/ 
+    if (m_bReturnInOrder) {
+    
+		  // Wait until it is our turn (only if we're returning in order)
+		  while (!m_buffer.oldest(iterStart)) {
+
+	      // Sleep before trying again
+	      usleep(THREAD_SLEEP_MICROSECONDS);			
+		  }
 		
+		}
+ 	
 		//printf("PFB::Process: Calling receiver...\n");
 		
-    pthread_mutex_lock(&m_mutexCallback);
+    pthread_mutex_lock(&m_mutexCallback);   
     m_pReceiver->onChannelizerData(&sData);
     pthread_mutex_unlock(&m_mutexCallback);
     
     //printf("PFB::Process: Done with chunk.\n");
+    
+    // Release the extra hold on the head (used above if return in order)
+	  m_buffer.release(iterStart); 
 
   }
 

@@ -5,7 +5,6 @@
 #include <unistd.h> // usleep
 
 #define SPEC_SLEEP_MICROSECONDS 5
-#define SPEC_PLOT_SECONDS 10
 
 // Terminal font colors
 #define RED   "\x1B[31m"
@@ -25,8 +24,8 @@ using namespace std;
 SpectrometerSimple::SpectrometerSimple(unsigned long uNumChannels, 
                                        unsigned long uNumSamplesPerAccumulation, 
                                        double dBandwidth,
-                                       unsigned int uNumAccumulators,
-                                       unsigned long uNumSpectraPerAccumulation,                                       
+                                       unsigned int uNumAccumulators,      
+                                       double dPlotIntervalSeconds,                               
                                        Digitizer* pDigitizer,
                                        Channelizer* pChannelizer,
                                        Controller* pController )
@@ -37,28 +36,21 @@ SpectrometerSimple::SpectrometerSimple(unsigned long uNumChannels,
   m_uNumSamplesPerAccumulation = uNumSamplesPerAccumulation;
   m_dBandwidth = dBandwidth;
   m_uNumAccumulators = uNumAccumulators;
+  m_dPlotIntervalSeconds = dPlotIntervalSeconds;
 
   // Derived configuration
   m_dChannelSize = m_dBandwidth / (double) m_uNumChannels; // MHz
-  m_dAccumulationTime = (double) uNumSamplesPerAccumulation / m_dBandwidth / 2.0; // seconds
+  m_dAccumulationTime = (double) uNumSamplesPerAccumulation / (m_dBandwidth * 1e6); // seconds
   m_dStartFreq = 0.0;
   m_dStopFreq = m_dBandwidth;
   m_dChannelFactor = 2; // because of Blackmann Harris 
   m_uNumFFT = 2*m_uNumChannels;
-  
-  m_uNumSpectraPerAccumulation = uNumSpectraPerAccumulation;  
-//  m_uNumSpectraPerAccumulation = m_uNumSamplesPerAccumulation / m_uNumFFT;
+  m_uNumSamplesSoFar = 0;  
+// m_uNumSpectraPerAccumulation = 1 + (uSamplesPerAccum - uNumTaps*uNumFFT) / uNumFFT;
+  m_uNumSpectraPerAccumulation = m_uNumSamplesPerAccumulation / m_uNumFFT;
 
 	printf("Spectrometer: Number of spectra per accumulation: %lu\n", m_uNumSpectraPerAccumulation);
 						
-  // Assign the Spectrometer instance's process function to the Digitizer
-  // callback on data transfer.
-  m_pDigitizer = pDigitizer;
-  m_pDigitizer->setCallback(this);
-  
-  // Remember the controller
-  m_pController = pController;
-
   // Setup the stop flags
   m_bLocalStop = false;
   m_bUseStopCycles = false;
@@ -66,33 +58,39 @@ SpectrometerSimple::SpectrometerSimple(unsigned long uNumChannels,
   m_bUseStopTime = false;
   m_uStopCycles = 0;
   m_dStopSeconds = 0;
-
-  // Initialize the FFT pool
+						
+  // Remember the controller
+  m_pController = pController;
+  
+    // Assign this instance to the digitizer callback to receive samples.
+  m_pDigitizer = pDigitizer;
+  m_pDigitizer->setCallback(this);
+  
+  // Assign this instance to channelizer to receive channelized spectra.
   m_pChannelizer = pChannelizer;
   m_pChannelizer->setCallback(this);
   
-	// Allocate the accumulators
+	// Allocate the accumulator pool
+	m_uNumMinFreeAccumulators = 0;
 	for (unsigned int i=0; i<m_uNumAccumulators; i++) {
 	
 		Accumulator* pAccum = new Accumulator();
 		if (pAccum)
 		{
+		  pAccum->setId(m_uNumMinFreeAccumulators++);
 			pAccum->init(m_uNumChannels, m_dStartFreq, m_dStopFreq, m_dChannelFactor);
-			m_released.push_front(pAccum);
-			m_uNumMinFreeAccumulators++;
+			m_empty.push_front(pAccum);
 		} else {
 			printf("Spectrometer: Failed to allocate accumulator %d\n", i);
 		}
 	}	
-	
-  
+	  
   // Initialize the mutex
   pthread_mutex_init(&m_mutex, NULL);
 
   // Spawn the disk writing thread
   printf("Spectrometer: Creating file thread...\n");
   m_bThreadIsReady = false;
-  m_bThreadStop = false;
   if (pthread_create(&m_thread, NULL, threadLoop, this) != 0 ) {
   	printf("Spectrometer: Failed to create thread.");
   	sendStop();
@@ -119,11 +117,7 @@ SpectrometerSimple::~SpectrometerSimple()
 {
 	// Make sure everyone knows we're stopping
 	sendStop();
-	
-	// Wait for all accumulations to finish writing
-  waitForDone();
-  m_bThreadStop = true;
-  
+	  
   // Disconnect from digitizer
   if (m_pDigitizer) {
     m_pDigitizer->setCallback(NULL);
@@ -133,7 +127,7 @@ SpectrometerSimple::~SpectrometerSimple()
   if (m_pChannelizer) {
 
     // Wait for the channelizer to send us any data it is still processing
-    m_pChannelizer->waitForEmpty();  
+    //m_pChannelizer->waitForEmpty();  
 
     // Disconnect
     m_pChannelizer->setCallback(NULL);
@@ -145,11 +139,11 @@ SpectrometerSimple::~SpectrometerSimple()
 	// Free accumulators
 	list<Accumulator*>::iterator it;
 
-	for (it = m_released.begin(); it != m_released.end(); it++) {
+	for (it = m_empty.begin(); it != m_empty.end(); it++) {
 		free(*it);
 	}
-
-	for (it = m_active.begin(); it != m_active.end(); it++) {
+	
+	for (it = m_receive.begin(); it != m_receive.end(); it++) {
 		free(*it);
 	}
 
@@ -165,119 +159,58 @@ SpectrometerSimple::~SpectrometerSimple()
 
 
 
+
 // ----------------------------------------------------------------------------
 // run() - Main executable function for the EDGES spectrometer
 // ----------------------------------------------------------------------------
 void SpectrometerSimple::run()
 { 
-  m_bLocalStop = false;
-  Timer totalRunTimer;
-  Timer dutyCycleTimer;
-  Timer writeTimer;
-  Timer plotTimer;
-  TimeKeeper tk;
-  unsigned long uCycleDrops = 0;
-  unsigned long uCycle = 0;
 
   if ((m_pDigitizer == NULL) || (m_pChannelizer == NULL)) {
     printf("Spectrometer: No digitizer or channelizer object at start of run.  End.\n");
     return;
   }
-
-  // Loop until a stop signal is received
-  totalRunTimer.tic();
-  printf("\n");
-
-  while (!isStop(uCycle, totalRunTimer)) {
-
-    uCycle++;
-    uCycleDrops = 0;
-    dutyCycleTimer.tic();
-    tk.setNow();
-
-    printf("----------------------------------------------------------------------\n");
-    printf("Spectrometer: Starting cycle %lu at %s\n", uCycle, tk.getDateTimeString(5).c_str());
-    printf("Spectrometer: Total run time so far: %.02f seconds (%.3g days)\n", 
-      totalRunTimer.toc(), totalRunTimer.toc()/3600.0/24);   
-    //printf("Spectrometer: m_write.size: %ld, m_active.size: %ld, m_released.size: %ld\n", m_write.size(), m_active.size(), m_released.size());
-    printf("----------------------------------------------------------------------\n");
-                  
-    Accumulator* pAccum = activateAccumulator();
-    if (pAccum) {
-         
-      // Mark state of new cycle
-	    tk.setNow();
-    
-      // Reset current accumulator and record start time
-      pAccum->clear();
-      pAccum->setStartTime(tk);
-      
-		  // Acquire data
-		  m_pDigitizer->acquire();
-
-      // Note the stop time
-      pAccum->setStopTime();
-      
-      // Wait for all the samples to be channelized
-      m_pChannelizer->waitForEmpty();
-    
-      // Normalize ADCmin and ADCmax:  we divide adcmin and adcmax by 2 here to  
-      // be backwards compatible with pxspec.  This limits adcmin and adcmax to 
-      // +/- 0.5 rather than +/-1.0
-      pAccum->setADCmin(pAccum->getADCmin()/2);
-      pAccum->setADCmax(pAccum->getADCmax()/2);   
-         
-      printf("Spectrometer: Duty cycle = %6.3f\n", 1.0 * m_uNumSamplesPerAccumulation / (2.0 * 1e6 * m_dBandwidth) / dutyCycleTimer.toc());
-      if (uCycleDrops > 0)
-      {	
-        printf("Spectrometer: Drop fraction = " RED "%6.3f\n" RESET, 1.0 * uCycleDrops / (m_uNumSamplesPerAccumulation + uCycleDrops));
-      } else {
-        printf("Spectrometer: Drop fraction = %6.3f\n", 1.0 * uCycleDrops / (m_uNumSamplesPerAccumulation + uCycleDrops));
-      }     
-      printf("Spectrometer: acdmin = %6.3f,  adcmax = %6.3f\n", pAccum->getADCmin(), pAccum->getADCmax());
-      printf("\n");
-    
-      // Write the accumulation (asynchronously)
-      transferAccumulatorToWriteQueue();
-      
-  	} else {
-  	  printf("Spectrometer: ERROR - Failed to activate accumulator. Aborting.\n");
-  	  sendStop();
-  	}
-  }
-
-  // Print closing info
-  printf("Spectrometer: Stopping...\n");
-  printf("Spectrometer: Total cycles: %lu\n", uCycle);
-  printf("Spectrometer: Total run time: %.02f seconds (%.3g days)\n", totalRunTimer.toc(), totalRunTimer.toc()/3600.0/24);
-
-  // Make sure we've finished processing and writing everything in queus before
-  // we end.
-  waitForDone();
+ 
+  // Reset the state
+  m_bLocalStop = false;
+  m_uNumSamplesSoFar = 0;  
+  moveAllToEmpty();
+  moveToReceive();
+  
+  TimeKeeper tk;
+  tk.setNow();
+  m_receive.front()->setStartTime(tk);
+  
+  // Take samples endlessly (stop signal is handled in threadloop function)
+  m_pDigitizer->acquire();
+  
+  // Stop gracefully
+  m_pChannelizer->waitForEmpty();
 
   printf("Spectrometer: Done.\n");
 
 } // run()
 
+
 // ----------------------------------------------------------------------------
 // handleLivePlot() - Handle output for live plotting if needed
 // ----------------------------------------------------------------------------
-bool SpectrometerSimple::handleLivePlot(Accumulator* pAccum) {
+bool SpectrometerSimple::handleLivePlot(Accumulator* pAccum, Timer& plotTimer) {
 
   // Should we be plotting?
   if (!m_pController->plot()) {
   
     // If not, make sure the timer is stopped
-    m_plotTimer.reset();
+    plotTimer.reset();
     return false;
   }
 
   // Plot if the controller just told us to start or if we've passed the
   // update interval
-  if (!m_plotTimer.running() || (m_plotTimer.toc() > SPEC_PLOT_SECONDS)) {
+  if (!plotTimer.running() || (plotTimer.toc() > m_dPlotIntervalSeconds)) {
       
     // Restart the plot timer
-    m_plotTimer.tic();
+    plotTimer.tic();
     
     // Write the temporary file for plotting
     if (!write_plot_file( m_pController->getPlotFilePath(), 
@@ -292,6 +225,7 @@ bool SpectrometerSimple::handleLivePlot(Accumulator* pAccum) {
   
   return true;
 }
+
 
 // ----------------------------------------------------------------------------
 // isStop() 
@@ -379,33 +313,96 @@ void SpectrometerSimple::threadIsReady()
 }
 
 
-
 // ----------------------------------------------------------------------------
 // threadLoop -- Primary execution loop of each thread
 // ----------------------------------------------------------------------------
 void* SpectrometerSimple::threadLoop(void* pContext)
 {
   SpectrometerSimple* pSpec = (SpectrometerSimple*) pContext;
-
+  Accumulator* pAccum = NULL;
+  Timer totalRunTimer;
+  Timer writeTimer;
+  Timer plotScheduleTimer;
+  Timer plotFileTimer;
+  TimeKeeper tk;
+  bool bPlot = false;
+  unsigned long uCycle = 0;
+  unsigned long uCycleDrops = 0;
+  double duration = 0;
+   
   // Report ready
   pSpec->threadIsReady();
 
-  while (!pSpec->m_bThreadStop) {
+  // Loop until a stop signal is received
+  totalRunTimer.tic();
+  plotScheduleTimer.tic();
+  printf("\n");
+  
+  while (!pSpec->isStop(uCycle, totalRunTimer)) {
 
-		Accumulator* pAccum = NULL;
-	
-		// If there are accumulations to write
-		pAccum = pSpec->m_write.front();
-		if (pAccum) {
+	  // If there are accumulations to write
+		if (!pSpec->m_write.empty()) {
 		
-			// Write to disk (creates new file/path if needed)
+      // Normalize ADCmin and ADCmax:  we divide adcmin and adcmax by 2 here to  
+      // be backwards compatible with pxspec.  This limits adcmin and adcmax to 
+      // +/- 0.5 rather than +/-1.0
+      pAccum = pSpec->m_write.front();
+      pAccum->setADCmin(pAccum->getADCmin()/2);
+      pAccum->setADCmax(pAccum->getADCmax()/2);  
+      
+      // Get some metrics
+      duration = pAccum->getStopTime() - pAccum->getStartTime();      
+      uCycleDrops = pAccum->getDrops(); 
+		  uCycle++;     
+		  tk.setNow(); 
+      
+      printf("----------------------------------------------------------------------\n");
+      printf("Spectrometer: Writing cycle %lu at %s\n", 
+        uCycle, tk.getDateTimeString(5).c_str());
+      printf("Spectrometer: Total run time so far: %.02f seconds (%.3g days)\n", 
+        totalRunTimer.toc(), totalRunTimer.toc()/3600.0/24);   
+      printf("----------------------------------------------------------------------\n");  
+      
+   			// Write to disk (creates new file/path if needed)
+			writeTimer.tic();
 			pSpec->writeToFile(pAccum);
+			writeTimer.toc();
 			
 			// Write live plot file needed
-			pSpec->handleLivePlot(pAccum);
-				
-		  // Release the accumulator back into waiting queue
-		  pSpec->releaseAccumulator();
+			plotFileTimer.tic();
+			bPlot = pSpec->handleLivePlot(pAccum, plotScheduleTimer);
+			plotFileTimer.toc();   
+      
+      printf("Spectrometer: Duty cycle = %6.3f over %.03f seconds\n", 
+        pSpec->m_dAccumulationTime / duration, duration);
+
+      //printf("Spectrometer: startTime %s and stop time %s\n", 
+      //  pAccum->getStartTime().getDateTimeString(6).c_str(), 
+      //  pAccum->getStopTime().getDateTimeString(6).c_str() );
+              
+      if (uCycleDrops > 0)
+      {	
+        printf("Spectrometer: Drop fraction = " RED "%6.3f\n" RESET, 
+          1.0 * uCycleDrops / (pSpec->m_uNumSamplesPerAccumulation + uCycleDrops));
+      } else {
+        printf("Spectrometer: Drop fraction = %6.3f\n", 
+          1.0 * uCycleDrops / (pSpec->m_uNumSamplesPerAccumulation + uCycleDrops));
+      }     
+      
+      printf("Spectrometer: acdmin = %6.3f,  adcmax = %6.3f\n", 
+        pAccum->getADCmin(), pAccum->getADCmax());
+    		
+    	if (bPlot) {
+        printf("Spectrometer: Write time = %.04f seconds (plus %.04f for plot file)\n", 
+          writeTimer.get(), plotFileTimer.get());
+      } else {
+        printf("Spectrometer: Write time = %0.4f seconds\n", writeTimer.get());      
+      } 
+            
+      printf("\n");
+        				
+		  // Release the accumulator back to the empty pool
+		  pSpec->moveToEmpty();
 		
     } else {
 
@@ -413,28 +410,18 @@ void* SpectrometerSimple::threadLoop(void* pContext)
       usleep(SPEC_SLEEP_MICROSECONDS);
     }
   }
-
+ 
+  // Print closing info
+  printf("Spectrometer: Stopping...\n");
+  printf("Spectrometer: Total cycles: %lu\n", uCycle);
+  printf("Spectrometer: Total run time: %.02f seconds (%.3g days)\n", totalRunTimer.toc(), totalRunTimer.toc()/3600.0/24); 
+ 
+  pSpec->m_pDigitizer->stop();
+   
   // Exit the thread
   pthread_exit(NULL);
 
 }
-
-
-
-// ----------------------------------------------------------------------------
-// WaitForDone
-// ----------------------------------------------------------------------------
-void SpectrometerSimple::waitForDone() 
-{
-  // Wait
-  while ((m_write.size() > 0) || (m_active.size() > 0)) 
-  {
-    printf("m_write.size: %ld, m_active.size: %ld, m_released.size: %ld\n", m_write.size(), m_active.size(), m_released.size());
-    usleep(1000000);
-  }
-}
-
-
 
 
 // ----------------------------------------------------------------------------
@@ -468,7 +455,8 @@ bool SpectrometerSimple::writeToFile(Accumulator* pAccum) {
     fs << ";--start_frequency: " << pAccum->getStartFreq() << " MHz" << std::endl;
     fs << ";--stop_frequency: " << pAccum->getStopFreq() << " MHz" << std::endl;
     
-    double dStepFreq = (pAccum->getStopFreq() - pAccum->getStartFreq()) / (double) pAccum->getDataLength();
+    double dStepFreq = (pAccum->getStopFreq() - 
+      pAccum->getStartFreq()) / (double) pAccum->getDataLength();
     fs << ";--step_frequency: " << dStepFreq << " MHz" << std::endl;    
     fs << ";+++END_DATA_HEADER" << std::endl;
     
@@ -501,26 +489,58 @@ unsigned long SpectrometerSimple::onDigitizerData( SAMPLE_DATA_TYPE* pBuffer,
   // printf("Spectrometer: OnDigitizerData\n");
   
   // Loop over the transferred data and enter it into the channelizer buffer
-  while ( ((uIndex + m_uNumFFT) <= uBufferLength) 
-         && (uTransferredSoFar < m_uNumSamplesPerAccumulation)) {
-    
+  while ( (uIndex + m_uNumFFT) <= uBufferLength ) {
+                     
     // Try to add to the channelizer buffer
     if (m_pChannelizer->push(&(pBuffer[uIndex]), m_uNumFFT, dScale, dOffset)) {
      
-      uTransferredSoFar += m_uNumFFT;
+//printf("OnDigitizer... Added samples associated with accumulator %u\n", m_receive.back()->getId());
+      
+      m_uNumSamplesSoFar += m_uNumFFT;
       uAdded++;
       
     }  else {
+      
       printf("Spectrometer::OnDigitizerData: Failed to push to channelizer!\n");
+      
+      // Record the dropped samples (drops are recorded to the freshest
+      // accummulator in the receive queue).  
+      m_receive.back()->addDrops(m_uNumFFT);
     } 
+    
+    // Time for a new accumulator?
+    if (m_uNumSamplesSoFar == m_uNumSamplesPerAccumulation) {
+                     
+      // Save the stop time   
+      if (!m_receive.empty()) {
+        m_receive.back()->setStopTime();
+      }
+      
+      // Add a new accumulator to receive queue for writing future samples
+      Accumulator* pAccum = moveToReceive();
+      if (pAccum) {
+      
+        // Set the start time in the accumlator
+        pAccum->setStartTime();
         
+      } else {        
+      
+        printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+        printf("Spectrometer::OnDigitizerData: Failed to get fresh accumulator!\n");   
+        printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");    
+      
+      }
+      
+      // Reset the sample counter
+      m_uNumSamplesSoFar = 0;   
+        
+    } // if uNumSmamplesSoFar
+    
     // Increment the index to the next chunk of transferred data
-    uIndex += m_uNumFFT;
-  }
-
-  // Keep a permanent record of how many samples were dropped
-  m_active.back()->addDrops(uBufferLength - uAdded * m_uNumFFT);
-
+    uIndex += m_uNumFFT;    
+    
+  } // while
+  
   // Return the total number of transferred samples that were successfully
   // entered in the FFTPool buffer for processing.
   return uAdded * m_uNumFFT;
@@ -531,90 +551,127 @@ unsigned long SpectrometerSimple::onDigitizerData( SAMPLE_DATA_TYPE* pBuffer,
 
 
 // ----------------------------------------------------------------------------
-// onChannelizerData() -- Do something with a spectrum returned from the Channelizer
+// onChannelizerData() -- Do something with a spectrum returned from the 
+//                        Channelizer
 // ----------------------------------------------------------------------------
 void SpectrometerSimple::onChannelizerData(ChannelizerData* pData) 
 {  
-	m_active.front()->add(pData->pData, pData->uNumChannels, pData->dADCmin, pData->dADCmax);
+  // Add data to the oldest accumuator in the receive queue until we've received
+  // enough specra to fill the accumulator, then move the accumlator to the
+  // write queue.  We don't need to worry about getting a new accumulator for 
+  // receiving because that happens based on how many samples we've received 
+  // from the digitizer in onDigitizerData().
+   
+	if (!m_receive.empty()) {
+	
+//	  printf("onChannelizer... Adding to accumulator %u\n", m_receive.front()->getId());
+	  
+	  if (m_receive.front()->add( pData->pData, 
+                                pData->uNumChannels, 
+                                pData->dADCmin, 
+                                pData->dADCmax ) >= m_uNumSpectraPerAccumulation ) {
+	    moveToWrite();
+	  }
+	}		  
 } // onChannelizerData()
 
 
 
 
 // ----------------------------------------------------------------------------
-// activateAccumulator()
+// moveToWrite
+// -- Returns a pointer to the moved accumulator (null if no action)
 // ----------------------------------------------------------------------------
-Accumulator* SpectrometerSimple::activateAccumulator() 
-{
-  Accumulator* pAccum = NULL;
-      
-  pthread_mutex_lock(&m_mutex);
-
-  if (!m_released.empty()) 
-  {	
-  	pAccum = m_released.front();
-    m_active.push_back(pAccum);
-  	m_released.pop_front();
-  }
-
-	if (m_uNumMinFreeAccumulators > m_released.size())
-		m_uNumMinFreeAccumulators = m_released.size();
-
-  pthread_mutex_unlock(&m_mutex);
-
-	return pAccum;
-}
-
-
-// ----------------------------------------------------------------------------
-// transferAccumulatorToWriteQueue()
-// -- Returns a pointer to the next active accumulator (if available, otherwise NULL)
-// ----------------------------------------------------------------------------
-Accumulator* SpectrometerSimple::transferAccumulatorToWriteQueue() 
+Accumulator* SpectrometerSimple::moveToWrite() 
 {
   Accumulator* pAccum = NULL;
   
-  pthread_mutex_lock(&m_mutex);
-  
-  if (!m_active.empty()) 
+  pthread_mutex_lock(&m_mutex);	
+    
+  if (!m_receive.empty()) 
   {
-  	pAccum = m_active.front();  	
+  	pAccum = m_receive.front();  
+  	m_receive.pop_front();	
   	m_write.push_back(pAccum);
-  	m_active.pop_front();
-  
-  	// Pointer to next accumulator in active queue
-  	if (!m_active.empty())
-  	{
-	  	pAccum = m_active.front();
-	 	}
   }
   
-  pthread_mutex_unlock(&m_mutex);
-  
+  pthread_mutex_unlock(&m_mutex);	
+    
   return pAccum;
 }
 	
 	
-	
 // ----------------------------------------------------------------------------
-// releaseAccumulator()
+// moveToReceive()
+// -- Returns a pointer to the moved accumulator (null if no action)
 // ----------------------------------------------------------------------------
-void SpectrometerSimple::releaseAccumulator() 
+Accumulator* SpectrometerSimple::moveToReceive() 
 {
 	Accumulator* pAccum = NULL;
-
-  pthread_mutex_lock(&m_mutex);
   
+  pthread_mutex_lock(&m_mutex);	
+    
+  if (!m_empty.empty()) 
+  {
+  	pAccum = m_empty.front();
+  	m_empty.pop_front();
+  	m_receive.push_back(pAccum);
+  	
+  	if (m_empty.size() < m_uNumMinFreeAccumulators) {
+  	  m_uNumMinFreeAccumulators = m_empty.size();
+  	}  	
+  } 
+  
+  pthread_mutex_unlock(&m_mutex);	 
+  
+  return pAccum; 
+}
+	
+
+// ----------------------------------------------------------------------------
+// moveToEmpty()
+// -- Returns a pointer to the moved accumulator (null if no action)
+// ----------------------------------------------------------------------------
+Accumulator* SpectrometerSimple::moveToEmpty() 
+{
+	Accumulator* pAccum = NULL;
+  
+  pthread_mutex_lock(&m_mutex);	
+    
   if (!m_write.empty()) 
   {
   	pAccum = m_write.front();
   	pAccum->clear();
-  	m_released.push_back(pAccum);
   	m_write.pop_front();
+  	m_empty.push_back(pAccum);
   }
   
-  pthread_mutex_unlock(&m_mutex);
+  pthread_mutex_unlock(&m_mutex);	  
+  
+  return pAccum;
 }
+
+// ----------------------------------------------------------------------------
+// moveAllToEmpty()
+// ----------------------------------------------------------------------------
+void SpectrometerSimple::moveAllToEmpty()
+{
+  pthread_mutex_lock(&m_mutex);	
+  
+	list<Accumulator*>::iterator it;  
+	for (it = m_receive.begin(); it != m_receive.end(); it++) {
+		(*it)->clear();
+		m_empty.push_back(*it);
+	}
+	m_receive.clear();
 	
+	for (it = m_write.begin(); it != m_write.end(); it++) {
+		(*it)->clear();
+		m_empty.push_back(*it);
+	}
+	m_write.clear();	
+	
+  pthread_mutex_unlock(&m_mutex);	
+}  
 
 	

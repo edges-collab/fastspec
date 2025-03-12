@@ -12,6 +12,7 @@ Buffer::Buffer() {
   m_uHolds = 0;
   m_uMaxFullSize = 0;
 	pthread_mutex_init(&m_mutex, NULL);
+	m_uIndex = 0;
 
 }
 
@@ -54,6 +55,7 @@ void Buffer::allocate(unsigned int uNumItems, unsigned int uItemLength) {
 	for (unsigned int i=0; i<uNumItems; i++) {
 		item.pData = (BUFFER_DATA_TYPE*) malloc(uItemLength*sizeof(BUFFER_DATA_TYPE));
 		item.uHolds = 0;
+		item.uIndex = 0;
 
 		if (item.pData !=NULL) {
 			m_empty.push_front(item);
@@ -74,6 +76,23 @@ void Buffer::allocate(unsigned int uNumItems, unsigned int uItemLength) {
   request(iter, 1);
   release(iter);
   clear(); 
+}
+
+
+// ----------------------------------------------------------------------------
+// copy
+// ----------------------------------------------------------------------------
+// 
+void Buffer::copy(const Buffer::iterator& iterOrig, Buffer::iterator& iterCopy) {
+
+	pthread_mutex_lock(&m_mutex);
+	
+  iterCopy = iterOrig;
+  (iterCopy.it)->uHolds++;
+  
+  m_uHolds++;
+	
+	pthread_mutex_unlock(&m_mutex);
 }
 
 
@@ -236,7 +255,7 @@ void Buffer::release(Buffer::iterator& iter) {
 
 
 // ----------------------------------------------------------------------------
-// block
+// data
 // ----------------------------------------------------------------------------
 // Get pointer to data block in iterator's current item
 BUFFER_DATA_TYPE* Buffer::data(Buffer::iterator& iter) {
@@ -248,6 +267,22 @@ BUFFER_DATA_TYPE* Buffer::data(Buffer::iterator& iter) {
     return (iter.it)->pData; 
   }
 }
+
+
+// ----------------------------------------------------------------------------
+// index
+// ----------------------------------------------------------------------------
+// Get pointer to data block in iterator's current item
+unsigned long long Buffer::index(Buffer::iterator& iter) {
+  
+  // Make sure is a valid iterator
+  if ((iter.pBuffer != this) || (iter.it == m_full.end())) {
+    return 0;  
+  } else {
+    return (iter.it)->uIndex; 
+  }
+}
+
 
 
 
@@ -326,7 +361,11 @@ bool Buffer::push(SAMPLE_DATA_TYPE* pIn, unsigned int uLength, double dScale,
       
       // Make sure holds are cleared
       item.uHolds = 0;
-
+      
+      // Tell the item its index and increment the main index to be ready for 
+      // next push.     
+      item.uIndex = m_uIndex++;
+      
       // Need to relock to finish list management (see unlock above copy)
     	pthread_mutex_lock(&m_mutex);
 
@@ -402,11 +441,14 @@ void Buffer::clear() {
   while (m_full.begin() != m_full.end()) {
     item = m_full.front();
     item.uHolds = 0;
+    item.uIndex = 0;
     m_full.pop_front();
     m_empty.push_front(item);
   }  
 
   m_pos = m_full.begin();
+  m_uHolds = 0;
+  m_uIndex = 0;
 
   pthread_mutex_unlock(&m_mutex);
 }

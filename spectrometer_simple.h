@@ -33,17 +33,17 @@ class SpectrometerSimple : public DigitizerReceiver, ChannelizerReceiver {
     
     pthread_t 					m_thread;
 		pthread_mutex_t   	m_mutex;    
-    list<Accumulator*>	m_released;
-		list<Accumulator*>	m_active;
+		list<Accumulator*>	m_receive;
 		list<Accumulator*>	m_write;
+		list<Accumulator*>	m_empty;
 		
-    Accumulator*    m_pCurrentAccum;
     unsigned long   m_uNumFFT;
     unsigned long   m_uNumChannels;
-    unsigned long   m_uNumSamplesPerAccumulation;
     unsigned long		m_uNumSpectraPerAccumulation;
-    unsigned int		m_uNumAccumulators;
-    unsigned int		m_uNumMinFreeAccumulators;
+    unsigned long   m_uNumSamplesPerAccumulation;
+    unsigned long   m_uNumSamplesSoFar;
+    unsigned int    m_uNumAccumulators;
+    unsigned int    m_uNumMinFreeAccumulators;
     double          m_dAccumulationTime;        // seconds
     double          m_dBandwidth;               // MHz
     double          m_dChannelSize;             // MHz
@@ -52,35 +52,33 @@ class SpectrometerSimple : public DigitizerReceiver, ChannelizerReceiver {
     double          m_dStopFreq;                // MHz
     bool            m_bLocalStop;
     bool						m_bThreadIsReady;
-    bool						m_bThreadStop;
     bool            m_bUseStopCycles;
     bool            m_bUseStopSeconds;
     bool            m_bUseStopTime;
     unsigned long   m_uStopCycles;
     double          m_dStopSeconds;             // Seconds
+    double          m_dPlotIntervalSeconds;     // Seconds
     TimeKeeper      m_tkStopTime;               // UTC
-    Timer           m_plotTimer;
-
 
     // Private helper functions
     std::string 		getFileName();
-    bool 						handleLivePlot(Accumulator*);
+    bool 						handleLivePlot(Accumulator*, Timer &);
     bool 						isStop(unsigned long, Timer&);
 		void 						threadIsReady();
-    void 						waitForDone();
     bool 						writeToFile(Accumulator*);
         
-    Accumulator* 		activateAccumulator();
-    void 						releaseAccumulator();    
-    Accumulator* 		transferAccumulatorToWriteQueue();
+    void        		moveAllToEmpty(); 
+    Accumulator*		moveToEmpty();   
+    Accumulator*  	moveToReceive();    
+    Accumulator* 		moveToWrite();
     
-     
-
+    
   public:
 
     // Constructor and destructor
-    SpectrometerSimple( unsigned long, unsigned long, double, unsigned int, unsigned long,
-                  Digitizer*, Channelizer*, Controller*);
+    SpectrometerSimple( unsigned long, unsigned long, double, unsigned int, 
+                        double, Digitizer*, Channelizer*, Controller* );
+                        
     ~SpectrometerSimple();
 
     // Execution functions
@@ -92,8 +90,9 @@ class SpectrometerSimple : public DigitizerReceiver, ChannelizerReceiver {
     void setStopTime(const std::string&);
 
     // Callbacks
-    unsigned long onDigitizerData(SAMPLE_DATA_TYPE*, unsigned int, unsigned long, double, double);
-    void onChannelizerData(ChannelizerData*);
+    unsigned long   onDigitizerData( SAMPLE_DATA_TYPE*, unsigned int, 
+                                     unsigned long, double, double );
+    void            onChannelizerData(ChannelizerData*);
     
     static void*    threadLoop(void*);
 

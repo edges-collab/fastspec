@@ -32,24 +32,27 @@ class Buffer {
 		public:
 
 			// Constructor
-			item(BUFFER_DATA_TYPE* p = NULL, unsigned int u = 0) 
-				: pData(p), uHolds(u) {}
+			item( BUFFER_DATA_TYPE* p = NULL, 
+			      unsigned int u = 0, 
+			      unsigned long long l = 0) 
+				: pData(p), uHolds(u), uIndex(l) {}
 
 			// Copy Constructor
 			item(const Buffer::item& item2) 
-				: pData(item2.pData), uHolds(item2.uHolds) {}		
+				: pData(item2.pData), uHolds(item2.uHolds), uIndex(item2.uIndex) {}		
 
 			// Destructor
 			~item() {}
 
 			// Operators
 			bool operator==(const Buffer::item& rhs) const {
-				return (pData == rhs.pData && uHolds == rhs.uHolds);
+				return (pData == rhs.pData && uHolds == rhs.uHolds && uIndex == rhs.uIndex);
 			}
 			
 			// Member variables
 			BUFFER_DATA_TYPE*		  pData;
 			unsigned int 					uHolds;
+			unsigned long long    uIndex;
 	};
 
 	// Nested class for the external iterator exposed by the buffer.
@@ -68,7 +71,8 @@ class Buffer {
 
 			// Destructor
 			~iterator() {}
-
+			
+			
 		private: 
 
 			// Member variables
@@ -88,6 +92,9 @@ class Buffer {
 	  // Allocate the buffer items that will be used.  This defines the size of 
 	  // the buffer and must be called before the before can be used.
 	  void allocate(unsigned int, unsigned int);
+	  
+	  // Get a copy of an iterator, incrementing the hold on its item
+	  void copy(const Buffer::iterator&, Buffer::iterator&);
 
 	  // Get the iterator of the next available item
 		bool request(Buffer::iterator&, unsigned int);
@@ -105,6 +112,9 @@ class Buffer {
 
 	  // Returns pointer to the buffer block in the current item in the iterator
 	  BUFFER_DATA_TYPE* data(Buffer::iterator&);
+	  
+	  // Returns index of the buffer block in the current item in the iterator
+	  unsigned long long index(Buffer::iterator&);
 
 	  // Push data into the buffer.  Returns false if buffer is full.
 	  bool push(BUFFER_DATA_TYPE*, unsigned int);
@@ -141,6 +151,8 @@ class Buffer {
 		unsigned int 										m_uHolds;
 		unsigned int 										m_uMaxFullSize;
 		pthread_mutex_t        					m_mutex;
+		
+		unsigned long long              m_uIndex;
 
 };
 
