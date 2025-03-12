@@ -15,6 +15,8 @@
 #define CYN   "\x1B[36m"
 #define WHT   "\x1B[37m"
 #define RESET "\x1B[0m"
+#define HIDE  "\e[?25l"
+#define SHOW  "\e[?25h"
 
 using namespace std;
 
@@ -106,8 +108,6 @@ SpectrometerSimple::SpectrometerSimple(unsigned long uNumChannels,
     usleep(10000);
   }
   printf("Spectrometer: Thread is ready after %.3g seconds\n", tr.toc());
-  
-  
 
 } // constructor
 
@@ -327,6 +327,98 @@ void* SpectrometerSimple::threadLoop(void* pContext)
   Timer writeTimer;
   Timer plotScheduleTimer;
   Timer plotFileTimer;
+  unsigned long uCycle = 0;
+  unsigned long uCycleDrops = 0;
+  double duration = 0;
+  char* pColor;
+  char red[] = "\x1B[31m";
+  char none[] = "";
+   
+  // Report ready
+  pSpec->threadIsReady();
+
+  // Loop until a stop signal is received
+  totalRunTimer.tic();
+  plotScheduleTimer.tic();
+  printf("\n");      
+  printf("----------------------------------------------------------------------\n");
+  
+  while (!pSpec->isStop(uCycle, totalRunTimer)) {
+
+	  // If there are accumulations to write
+		if (!pSpec->m_write.empty()) {
+		
+      // Normalize ADCmin and ADCmax:  we divide adcmin and adcmax by 2 here to  
+      // be backwards compatible with pxspec.  This limits adcmin and adcmax to 
+      // +/- 0.5 rather than +/-1.0
+      pAccum = pSpec->m_write.front();
+      pAccum->setADCmin(pAccum->getADCmin()/2);
+      pAccum->setADCmax(pAccum->getADCmax()/2);  
+      
+      // Get some metrics
+      duration = pAccum->getStopTime() - pAccum->getStartTime();      
+      uCycleDrops = pAccum->getDrops(); 
+		  uCycle++;          
+      pColor = (uCycleDrops > 0) ? red : none;
+       
+      // Write to disk (creates new file/path if needed)
+			writeTimer.tic();
+			pSpec->writeToFile(pAccum);
+			writeTimer.toc();
+			
+			// Write live plot file needed
+			plotFileTimer.tic();
+			pSpec->handleLivePlot(pAccum, plotScheduleTimer);
+			plotFileTimer.toc();   
+        			
+      // Update the console	
+      printf("\rCycle: %lu at %s | Run: %6.3f h | " 
+              CYN "Duty: %4.3f" RESET " | " 
+              GRN "ADC: %6.3f/%6.3f" RESET 
+              " | Drops: %s%6.3f" RESET "    " HIDE, 
+        uCycle, pAccum->getStartTime().getDateTimeString(5).c_str(),
+        totalRunTimer.toc()/3600.0,
+        pSpec->m_dAccumulationTime / duration,
+        pAccum->getADCmin(), pAccum->getADCmax(),
+        pColor, 1.0 * uCycleDrops / (pSpec->m_uNumSamplesPerAccumulation + uCycleDrops) );
+
+      fflush(stdout);  // Make sure the line is printed
+                				
+		  // Release the accumulator back to the empty pool
+		  pSpec->moveToEmpty();
+		
+    } else {
+
+      // Sleep before trying again
+      usleep(SPEC_SLEEP_MICROSECONDS);
+    }
+  }
+ 
+  // Print closing info
+  printf("Spectrometer: Stopping...\n");
+  printf("Spectrometer: Total cycles: %lu\n", uCycle);
+  printf("Spectrometer: Total run time: %.02f seconds (%.3g days)\n", totalRunTimer.toc(), totalRunTimer.toc()/3600.0/24); 
+  printf( SHOW );  // Make the cursor visibile again (hidden in the update line)
+ 
+  pSpec->m_pDigitizer->stop();
+   
+  // Exit the thread
+  pthread_exit(NULL);
+
+}
+
+/*
+// ----------------------------------------------------------------------------
+// threadLoop -- Primary execution loop of each thread
+// ----------------------------------------------------------------------------
+void* SpectrometerSimple::threadLoop(void* pContext)
+{
+  SpectrometerSimple* pSpec = (SpectrometerSimple*) pContext;
+  Accumulator* pAccum = NULL;
+  Timer totalRunTimer;
+  Timer writeTimer;
+  Timer plotScheduleTimer;
+  Timer plotFileTimer;
   TimeKeeper tk;
   bool bPlot = false;
   unsigned long uCycle = 0;
@@ -425,7 +517,7 @@ void* SpectrometerSimple::threadLoop(void* pContext)
   pthread_exit(NULL);
 
 }
-
+*/
 
 // ----------------------------------------------------------------------------
 // WriteToFile
@@ -435,9 +527,6 @@ bool SpectrometerSimple::writeToFile(Accumulator* pAccum) {
   std::string sFilePath = m_pController->getAcqFilePath(pAccum->getStartTime());
   sFilePath.replace(sFilePath.length()-3, 3, "ssp");
   
-  // Write the data
-  printf("Spectrometer: Writing accumulations to file: %s\n", sFilePath.c_str());
-
   // If needed, start a new file and write the header
   if (!is_file(sFilePath)) {
 
@@ -448,6 +537,9 @@ bool SpectrometerSimple::writeToFile(Accumulator* pAccum) {
       printf("Spectrometer: Failed to write header to new .acq file.\n");
       return false;
     }
+    
+    printf("\nSpectrometer: Writing accumulations to file: %s\n", sFilePath.c_str());
+      
     fs << "; SIMPLESPEC v" << VERSION_MAJOR << "." 
                            << VERSION_MINOR << "." 
                            << VERSION_PATCH << std::endl;
