@@ -84,6 +84,9 @@ SpectrometerSimple::SpectrometerSimple(unsigned long uNumChannels,
 			printf("Spectrometer: Failed to allocate accumulator %d\n", i);
 		}
 	}	
+	printf("Spectrometer: Allocated %u accumulators (%.02f MB)\n", 
+	  m_uNumMinFreeAccumulators, 
+	  1.0*m_uNumMinFreeAccumulators*m_uNumChannels*sizeof(ACCUM_DATA_TYPE)/1e6);
 	  
   // Initialize the mutex
   pthread_mutex_init(&m_mutex, NULL);
