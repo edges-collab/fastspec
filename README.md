@@ -24,10 +24,14 @@ Prior to building, ensure the following dependencies are installed on the system
 * `RazorMax` - use make flag: digitizer=razormax
 
 ### Build Configuration and Process
-After installing the dependencies, build FASTSPEC by entering the `fastspec/` directory and using `make` to compile the executable.  FASTSPEC is configured using `make` flags following the form:
+This FASTSPEC repository supports building two applications: FASTSPEC and SIMPLESPEC.  After installing the dependencies, build either application by entering the `fastspec/` directory and using `make` to compile the executable.  FASTSPEC is configured using `make` flags following the form:
 ```
-$ make digitizer=<flag> switch=<flag> precision=<flag>
+$ make application=<flag> digitizer=<flag> switch=<flag> precision=<flag>
 ```
+Supported application flags are:
+* `fastspec` - Builds a binary executable for the FASTSPEC spectrometer customized to support EDGES instruments.  This application cycles between the EDGES three-position switch states using the method specified in the `switch=<flag>` argument of the make command line.  All make command line flags are supported.  Output is written to the historical EDGES file format (.acq), which is uuencoded ASCII.
+* `simplespec` - Builds a binary exectuable for the SIMPLESPEC spectrometer that is a generic streaming spectrometer that dumps accumulated spectra to a binary file (.ssp).  All make command line flags are supported except `switch`, which is ignored if present.
+
 Supported digitizer flags are:
 
 * `pxboard` - Requires the `sig_px14400` driver and px14.h header file to be installed (see dependencies above).
