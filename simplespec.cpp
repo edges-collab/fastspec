@@ -1,5 +1,5 @@
 
-#define DEFAULT_INI_FILE "./fastspec.ini"
+#define DEFAULT_INI_FILE "./simplespec.ini"
 
 // Handle the digitizer configuration compiler flags
 #if defined DIG_RAZORMAX
@@ -12,26 +12,10 @@
   #error Aborted in fastspec.cpp because digitizer flag not defined
 #endif
 
-// Handle the switch configuration compiler flags
-#if defined SW_MEZIO
-  #include "swneuosys.h"
-#elif defined SW_PARALLELPORT
-  #include "swparallelport.h"
-#elif defined SW_TTY
-  #include "swtty.h"
-#elif defined SW_LABJACK
-  #include "swlabjack.h"
-#elif defined SW_SIM
-  #include "swsim.h"
-#elif
-  #error Aborted in fastspec.cpp because switch flag not defined
-#endif
-
 
 #include "pfb.h"
 #include "dumper.h"
-#include "spectrometer.h"
-#include "switch.h"
+#include "spectrometer_simple.h"
 #include "utility.h"
 #include "controller.h"
 #include "version.h"
@@ -57,18 +41,15 @@ void print_help()
 
   printf("\n");
   printf("| ------------------------------------------------------------------------\n");
-  printf("| FASTSPEC v%d.%d.%d - HELP\n", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
+  printf("| SIMPLESPEC v%d.%d.%d - HELP\n", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
   printf("| ------------------------------------------------------------------------\n\n");
 
-  printf("FASTPEC is a spectrometer for the EDGES instrument.  It controls the\n");
-  printf("receiver switch states and acquires samples from an analog-to-digital\n");
+  printf("SIMPLESPEC is a generic spectrometer.  It acquires samples from an analog-to-digital\n");
   printf("converter (ADC) and sends them through a polyphase filter bank (PFB) for\n");
   printf("channelization.  Channelization is multi-threaded. Accumulated spectra\n");
-  printf("are stored to disk in an .acq file.  Raw samples from the antenna switch\n");
-  printf("state can be optionally stored directly to disk in a .dmp file, however\n");
-  printf("the data volume is very large (tpyically about 1 GB/s).\n\n");
+  printf("are stored to disk in a binary file.\n\n");
 
-  printf("FASTSPEC accepts many configuration settings, all of which are available\n");
+  printf("SIMPLESPEC accepts many configuration settings, all of which are available\n");
   printf("through command line arguments and by using a .ini configuration file.\n");
   printf("The list of configuration settings printed above shows all of the\n");
   printf("options supported.  The first term (e.g. 'Spectrometer') provides the .ini\n");
@@ -90,7 +71,7 @@ void print_help()
 
   printf("               " DEFAULT_INI_FILE "\n\n");
 
-  printf("FASTSPEC can also be called to control the behavior of an already running\n");
+  printf("SIMPLESPEC can also be called to control the behavior of an already running\n");
   printf("instance.  Six commands are supported:\n\n");
 
   
@@ -101,11 +82,11 @@ void print_help()
   printf("kill      Send the hard abort 'kill -9' signal to the already running instance.\n"); 
   printf("stop      Send a soft stop signal to the already running instance.\n\n");
 
-  printf("FASTSPEC uses gnuplot for live plotting ('-p', '--show_plots').  Gnuplot can be\n");
+  printf("SIMPLESPEC uses gnuplot for live plotting ('-p', '--show_plots').  Gnuplot can be\n");
   printf("installed using the system package manager, e.g. sudo apt-get install gnuplot.\n");
   printf("In addition to the built-in gnuplot commands, such as '+' and '-' to scale\n");
   printf("the plot, right clicking corners of a box to zoom, exporting to image files,\n");
-  printf("etc., the FASTSPEC plot can be toggled between a plot showing the raw switch\n");
+  printf("etc., the SIMPLESPEC plot can be toggled between a plot showing the raw switch\n");
   printf("spectra and a plot showing the'corrected' (uncalibrated) antenna temperature\n"); 
   printf("by pressing 'x' in the plot window.\n\n");
 
@@ -123,7 +104,7 @@ int main(int argc, char* argv[])
 
     printf("\n");
     printf("| ------------------------------------------------------------------------\n");
-    printf("| FASTSPEC v%d.%d.%d\n", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
+    printf("| SIMPLESPEC v%d.%d.%d\n", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
     printf("| ------------------------------------------------------------------------\n");
     printf("\n");
 
@@ -167,21 +148,11 @@ int main(int argc, char* argv[])
     string sInstrument        = ctrl.getOptionStr("Installation", "instrument", "-j", "");
     string sUserOutput        = ctrl.getOptionStr("Spectrometer", "output_file", "-f", "");
     
-    // Switch configuration
-    double dSwitchDelay       = ctrl.getOptionReal("Spectrometer", "switch_delay", "-e", 0.5);
-  #if defined SW_PARALLELPORT   
-    long uSwitchIOPort        = ctrl.getOptionInt("Spectrometer", "switch_io_port", "-o", 0x3010);
-  #elif defined SW_TTY
-    string sSwitchTTYPath     = ctrl.getOptionStr("Spectrometer", "switch_tty_path", "-TP", "/dev/ttyACM0");
-    string sSwitchTTYInit     = ctrl.getOptionStr("Spectrometer", "switch_tty_init", "-TIN", "MEM,0\nOOBSPDT,1\nOOB,1\nNoise,0\nAtten,1\nHot,0\n");
-    string sSwitchTTYState0   = ctrl.getOptionStr("Spectrometer", "switch_tty_0", "-T0", "MEM,0\nNoise,0\n");
-    string sSwitchTTYState1   = ctrl.getOptionStr("Spectrometer", "switch_tty_1", "-T1", "MEM,6\nNoise,0\n");
-    string sSwitchTTYState2   = ctrl.getOptionStr("Spectrometer", "switch_tty_2", "-T2", "MEM,6\nNoise,1\n");
-  #endif
   
     // Digitizer configuration
     long uSamplesPerAccum     = ctrl.getOptionInt("Spectrometer", "samples_per_accumulation", "-a", 1024L*2L*1024L*1024L);
     long uSamplesPerTransfer  = ctrl.getOptionInt("Spectrometer", "samples_per_transfer", "-t", 2*1024*1024);
+    long uNumAccumulators		  = ctrl.getOptionInt("Spectrometer", "num_accumulators", "-o", 32);
     double dAcquisitionRate   = ctrl.getOptionInt("Spectrometer", "acquisition_rate", "-r", 400);
     
     #if defined DIG_PXBOARD    
@@ -202,17 +173,15 @@ int main(int argc, char* argv[])
     long uWindowFunctionId    = ctrl.getOptionInt("Spectrometer", "window_function_id", "-w", 1);
     long uNumThreads          = ctrl.getOptionInt("Spectrometer", "num_fft_threads", "-m", 4);
     long uNumBuffers          = ctrl.getOptionInt("Spectrometer", "num_fft_buffers", "-b", 400);
-    
-    // Raw data dumper configuration
-    long uNumDumpBuffers      = ctrl.getOptionInt("Spectrometer", "num_dump_buffers", "-M", 1000);
-    
+        
     // Run configuration
     long uStopCycles          = ctrl.getOptionInt("Spectrometer", "stop_cycles", "-c", 0); 
     double dStopSeconds       = ctrl.getOptionReal("Spectrometer", "stop_seconds", "-s", 0);
     string sStopTime          = ctrl.getOptionStr("Spectrometer", "stop_time", "-u", "");
     bool bPlot                = ctrl.getOptionBool("Spectrometer", "show_plots", "-p", false);    
-    long uPlotBin             = ctrl.getOptionInt("Spectrometer", "plot_bin", "-B", 1);  
-    bool bDump                = ctrl.getOptionBool("Spectrometer", "dump_raw_data", "-y", false); 
+    long uPlotBin             = ctrl.getOptionInt("Spectrometer", "plot_bin", "-B", 1);    
+    long uPlotInterval        = ctrl.getOptionInt("Spectrometer", "plot_interval_seconds", "-e", 10);  
+   // bool bDump                = ctrl.getOptionBool("Spectrometer", "dump_raw_data", "-y", false); 
 
 
     // Handle help flag if set (do this after parsing configuration so that the
@@ -225,7 +194,6 @@ int main(int argc, char* argv[])
     // Set some controls (the controller parses the configuration, but doesn't
     // used any of the info until explictly told)
     ctrl.setPlot(bPlot, (unsigned int) uPlotBin); 
-    ctrl.setDump(bDump);    
     ctrl.setOutputConfig(sDataDir, sSite, sInstrument, sUserOutput);
 
     // Calculate a few derived configuration parameters
@@ -251,58 +219,24 @@ int main(int argc, char* argv[])
              "achieve highest possible duty cycle.\n\n");
     }
 
-    // -----------------------------------------------------------------------
-    // Initialize the receiver switch
-    // -----------------------------------------------------------------------      
-    #if defined SW_MEZIO
-      SWNeuosys sw;
-      if (!sw.init(uSwitchIOPort)) {
-        printf("Failed to control MEZIO switch.  Abort.\n");
-        return 1;
-      }  
-    #elif defined SW_PARALLELPORT
-      SWParallelPort sw;
-      if (!sw.init(uSwitchIOPort)) {
-        printf("Failed to control parallel port switch.  Abort.\n");
-        return 1;
-      }      
-    #elif defined SW_TTY
-      SWTTY sw( sSwitchTTYPath, sSwitchTTYState0,
-                sSwitchTTYState1, sSwitchTTYState2 );
-      if (!sw.init(sSwitchTTYInit)) {
-        printf("Failed to control TTY switch.  Abort.\n");
-        return 1;
-      }
-    #elif defined SW_LABJACK
-      SWLabJack sw;
-      if (!sw.init()) {
-				printf("Failed to control Labjack switch.  Abort.\n");
-        return 1;
-      }
-    #elif defined SW_SIM
-      SWSim sw;
-    #endif
-
-    // Start off in state 0
-    sw.set(0);
-
+   
     // -----------------------------------------------------------------------
     // Initialize the digitizer board
     // -----------------------------------------------------------------------
 
     #if defined DIG_RAZORMAX
       RazorMax dig( dAcquisitionRate, 
-                    uSamplesPerAccum, 
+                    0, // for continuous sampling
                     uSamplesPerTransfer ); 
     #elif defined DIG_PXBOARD
       PXBoard dig( dAcquisitionRate, 
-                   uSamplesPerAccum, 
+                   0, // for continuous sampling
                    uSamplesPerTransfer, 
                    uInputChannel, 
                    uVoltageRange );
     #elif defined DIG_PXSIM
       PXSim dig( dAcquisitionRate, 
-                 uSamplesPerAccum, 
+                 0, // for continuous sampling
                  uSamplesPerTransfer );
       dig.setSignal(dCWFreq1, dCWAmp1, dCWFreq2, dCWAmp2, dNoiseAmp, dOffset);
     #endif
@@ -320,41 +254,27 @@ int main(int argc, char* argv[])
                uNumBuffers,
                uNumChannels, 
                uNumTaps, 
-               uWindowFunctionId, 
-               false );
-
-
-    // -----------------------------------------------------------------------
-    // Initialize the asynchronous raw data dumper
-    // -----------------------------------------------------------------------   
-    Dumper dump ( uSamplesPerAccum*dig.bytesPerSample(),
-                  uSamplesPerTransfer*dig.bytesPerSample(), 
-                  uNumDumpBuffers,
-                  dig.type(),
-                  dAcquisitionRate,
-                  dig.scale(),
-                  dig.offset() );
-
+               uWindowFunctionId,
+               true );  // return in order
 
     // -----------------------------------------------------------------------
     // Initialize the Spectrometer
     // -----------------------------------------------------------------------
-    Spectrometer spec( uNumChannels, 
-                       uSamplesPerAccum, 
-                       dBandwidth, 
-                       dSwitchDelay,
-                       (Digitizer*) &dig,
-                       (Channelizer*) &chan,
-                       &dump,
-                       (Switch*) &sw, 
-                       &ctrl );
+    SpectrometerSimple spec( uNumChannels, 
+                             uSamplesPerAccum, 
+                             dBandwidth,
+                             uNumAccumulators,
+                             (double) uPlotInterval,
+                             (Digitizer*) &dig,
+                             (Channelizer*) &chan,
+                             &ctrl );
 
     if (uStopCycles > 0) { spec.setStopCycles(uStopCycles); }
     if (dStopSeconds > 0) { spec.setStopSeconds(dStopSeconds); }
     if (!sStopTime.empty()) { spec.setStopTime(sStopTime); }
 
     // -----------------------------------------------------------------------
-    // Take data until the controller tell us it is time to stop
+    // Take data until the controller tells us it is time to stop
     // (usually when a SIGINT is received)
     // -----------------------------------------------------------------------    
     spec.run();

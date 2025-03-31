@@ -97,7 +97,7 @@ class PXSim : public Digitizer {
       
       double dTransferTime = m_uSamplesPerTransfer / m_dAcquisitionRate / 1.0e6;
       
-      printf("Transfer time: %10.10f\n", dTransferTime);
+      // printf("PXSim: Desired transfer time=%10.10f\n", dTransferTime);
 
       // Reset the stop flag
       m_bStop = false;
@@ -120,18 +120,20 @@ class PXSim : public Digitizer {
       timer.tic();
 
       // Loop over number of transfers requested
-      unsigned long long uSampleIndex = 0;  
+      double uSampleIndex = 0;  
       unsigned long uRandom = 0;
       unsigned short* pPointer = 0; // used to divide 64 bit uRandom into 4 x 16 bit components
       float cw[4];     
       float dCW1 = 2.0 * M_PI * m_dCWFreq1 / m_dAcquisitionRate;
       float dCW2 = 2.0 * M_PI * m_dCWFreq2 / m_dAcquisitionRate;
             
-      while ((uNumSamples < m_uSamplesPerAccumulation) && !m_bStop) {
+      while (!m_bStop) {
 
+        // printf("PXSim: uNumSamples= %lu of %lu\n", uNumSamples, m_uSamplesPerAccumulation);
+        
         // For each transfer, populate the buffer
         for (unsigned int i=0; i<m_uSamplesPerTransfer; i+=4) {
-
+          
           // Calculate four voltage samples of two continuous waves
           cw[0]  = m_dCWAmp1 * sin(dCW1 * uSampleIndex);
           cw[0] += m_dCWAmp2 * sin(dCW2 * uSampleIndex++);
@@ -170,15 +172,26 @@ class PXSim : public Digitizer {
             usleep( (dTransferTime - timer.get()) * 1e6 );
         }
 
-        printf("Actual transfer time: %8.6f, Desired transfer time: %8.6f, Diff: %8.6f\n", 
-          timer.get(), dTransferTime, (dTransferTime-timer.get())*1.0e6);
-
+        if (uNumSamples == 0) {
+          printf("Actual transfer time: %8.6f, Desired transfer time: %8.6f, Diff: %8.6f\n", 
+            timer.get(), dTransferTime, (dTransferTime-timer.get())*1.0e6);
+        }
+        
         // Reset the timer
         timer.tic();
 
         // Call the callback function to process the chunk of data
         uNumSamples += m_pReceiver->onDigitizerData(m_pBuffer, m_uSamplesPerTransfer, uNumSamples, m_dScale, m_dOffset);
 
+        // Check if we need to the stop the loop.  Only stop if we've reached the 
+        // the number of desired samples.  If the accumulation size is zero, we 
+        // will run continuously and only stop by an external trigger, never on 
+        // our own.    
+        if ((m_uSamplesPerAccumulation > 0) && (m_uSamplesPerAccumulation <= uNumSamples))
+        {
+          stop();
+        }
+    
       } // transfer loop
 
       return true;

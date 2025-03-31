@@ -390,7 +390,7 @@ bool PXBoard::acquire()
   // fresh acquisition data to one half, we process the other half.
 
   // Loop over number of transfers requested
-  while ((uNumSamples < m_uSamplesPerAccumulation) && !m_bStop) {
+  while (!m_bStop) {
 
     // Determine where new data transfer data will go. We alternate
     // between our two DMA buffers
@@ -448,6 +448,15 @@ bool PXBoard::acquire()
     // Switch buffers
     pPreviousBuffer = pCurrentBuffer;
     n++;
+    
+    // Check if we need to the stop the loop.  Only stop if we've reached the 
+    // the number of desired samples.  If the accumulation size is zero, we 
+    // will run continuously and only stop by an external trigger, never on 
+    // our own.    
+    if ((m_uSamplesPerAccumulation > 0) && (m_uSamplesPerAccumulation <= uNumSamples))
+    {
+      stop();
+    }
 
   } // transfer loop
 

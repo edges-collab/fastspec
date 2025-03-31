@@ -31,6 +31,7 @@ class Accumulator {
     double          m_dChannelFactor;
     double          m_dTemperature;
     unsigned long   m_uDrops;
+    unsigned int    m_uId;
     TimeKeeper      m_startTime;
     TimeKeeper      m_stopTime;
 
@@ -40,7 +41,8 @@ class Accumulator {
     
     Accumulator() : m_pSpectrum(NULL), m_uDataLength(0), m_uNumAccums(0), 
                     m_dADCmin(0), m_dADCmax(0), m_dStartFreq(0), m_dStopFreq(0), 
-                    m_dChannelFactor(0), m_dTemperature(0), m_uDrops(0) { }
+                    m_dChannelFactor(0), m_dTemperature(0), m_uDrops(0),
+                    m_uId(0) { }
     
     ~Accumulator()
     {
@@ -62,7 +64,7 @@ class Accumulator {
 
 
     template<typename T>
-    bool add(const T* pSpectrum, unsigned int uLength, double dADCmin, double dADCmax) 
+    unsigned int add(const T* pSpectrum, unsigned int uLength, double dADCmin, double dADCmax) 
     {
 
       // Abort if there isn't valid data to include
@@ -75,15 +77,12 @@ class Accumulator {
       m_dADCmin = (dADCmin < m_dADCmin) ? dADCmin : m_dADCmin;
       m_dADCmax = (dADCmax > m_dADCmax) ? dADCmax : m_dADCmax;
 
-      // Increment the block counter
-      m_uNumAccums++;
-
       // Add the new spectrum to the accumulation 
       for (unsigned int n=0; n<uLength; n++) {
         m_pSpectrum[n] += pSpectrum[n];
       }
 
-      return true;
+      return ++m_uNumAccums;
     }
     
     void addDrops(unsigned long uDrops) { m_uDrops += uDrops; }
@@ -188,6 +187,8 @@ class Accumulator {
     }
     
     unsigned int getDataLength() const { return m_uDataLength; }
+    
+    unsigned int getId() const { return m_uId; }
 
     unsigned int getNumAccums() const { return m_uNumAccums; }
 
@@ -208,6 +209,9 @@ class Accumulator {
     void init(unsigned int uDataLength, double dStartFreq, double dStopFreq, 
               double dChannelFactor) 
     { 
+      if (m_pSpectrum) {
+        free(m_pSpectrum);
+      }
       m_pSpectrum = (ACCUM_DATA_TYPE*) malloc(uDataLength * sizeof(ACCUM_DATA_TYPE));
       m_uDataLength = uDataLength;
       m_dStartFreq = dStartFreq;
@@ -237,6 +241,8 @@ class Accumulator {
     void setTemperature(double dTemperature) { m_dTemperature = dTemperature; }
 
     void setDrops(unsigned long uDrops) { m_uDrops = uDrops; }
+    
+    void setId(unsigned int uId) { m_uId = uId; };
 
 
 };

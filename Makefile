@@ -4,7 +4,26 @@
 # SETUP FROM COMMAND LINE ARGUMENTS
 # ------------------------------------------------------------------------------
 
-# Setup the digitizer configuration
+# Setup the application type configuration
+ifeq ($(application), fastspec)
+  CORE_SRCS := buffer.cpp bytebuffer.cpp controller.cpp dumper.cpp fastspec.cpp \
+	  ini.cpp pfb.cpp spectrometer.cpp utility.cpp 
+  CORE_HDRS := accumulator.h buffer.h bytebuffer.h channelizer.h controller.h  \
+	  digitizer.h dumper.h ini.h pfb.h spectrometer.h switch.h spawn.h timing.h  \
+	  utility.h version.h wdt_dio.h 
+else ifeq ($(application), simplespec)
+  CORE_SRCS := buffer.cpp bytebuffer.cpp controller.cpp simplespec.cpp \
+	  ini.cpp pfb.cpp spectrometer_simple.cpp utility.cpp 
+  CORE_HDRS := accumulator.h buffer.h bytebuffer.h channelizer.h controller.h  \
+	  digitizer.h ini.h pfb.h spectrometer_simple.h spawn.h timing.h  \
+	  utility.h version.h wdt_dio.h 
+else
+	# Proceed with default (fastspec)
+	override application := fastspec
+	USE_DEFAULT_APP := true
+endif
+	
+	# Setup the digitizer configuration
 ifeq ($(digitizer), pxboard)
 	DIG_SRCS := pxboard.cpp
 	DIG_HDRS := pxboard.h
@@ -78,23 +97,24 @@ else
 endif
 
 
+
+
 # ------------------------------------------------------------------------------
 # SETUP CORE CONFIGURATION
 # ------------------------------------------------------------------------------
 
 # Outname executable name
-TARGET_BASE := fastspec
-TARGET := $(TARGET_BASE)_$(digitizer)_$(switch)_$(precision)
+TARGET_BASE := $(application)
+ifeq ($(application), fastspec)
+  TARGET := $(TARGET_BASE)_$(digitizer)_$(switch)_$(precision)
+else
+  TARGET := $(TARGET_BASE)_$(digitizer)_$(precision)
+endif
 
 # Directory to install	
 INSTALL := /usr/local/bin
 
 # Files and libraries shared by all configurations
-CORE_SRCS := buffer.cpp bytebuffer.cpp controller.cpp dumper.cpp fastspec.cpp \
-	ini.cpp pfb.cpp spectrometer.cpp utility.cpp 
-CORE_HDRS := accumulator.h buffer.h bytebuffer.h channelizer.h controller.h  \
-	digitizer.h dumper.h ini.h pfb.h spectrometer.h switch.h spawn.h timing.h  \
-	utility.h version.h wdt_dio.h 
 CORE_LIBS := -pthread -lrt
 CORE_CFLAGS := -Wall -O3 -mtune=native -std=c++0x -L/usr/lib
 
@@ -110,28 +130,40 @@ CORE_CFLAGS := -Wall -O3 -mtune=native -std=c++0x -L/usr/lib
 #                       make command line
 $(TARGET): $(CORE_SRCS) $(DIG_SRCS) $(SW_SRCS) $(CORE_HDRS) $(DIG_HDRS) $(SW_HDRS)
 
-ifdef ERROR_DIG
-	# Abort with error message
-	$(error No digitizer type specified on make command line. Use make argument: \
-	  digitizer=[pxboard, pxsim, razormax])
-endif
+  ifdef ERROR_DIG
+	  # Abort with error message
+	  $(error No digitizer type specified on make command line. Use make argument: \
+	    digitizer=[pxboard, pxsim, razormax])
+  endif
 
-ifdef ERROR_SWITCH
-	# Abort with error message
-	$(error No switch method specified on make command line. Use make argument: \
-	  switch=[mezio, parallelport, sim])
-endif
+  ifeq ($(application), fastspec)
+    ifdef ERROR_SWITCH
+	    # Abort with error message
+	    $(error No switch method specified on make command line. Use make argument: \
+	      switch=[mezio, parallelport, sim])
+    endif
+  endif
 
-ifdef USE_DEFAULT_PRECISION
+  ifdef USE_DEFAULT_APP
+	  @echo ""
+	  @echo "WARNING: Build application not specified or not recognized on make" 
+	  @echo "         command line. Proceeding with fastspec application. Use make"  
+	  @echo "         argument: application=[fastspec, simplespec]"
+  endif 
+  
+  ifdef USE_DEFAULT_PRECISION
+	  @echo ""
+	  @echo "WARNING: Floating point math precision not specified or not recognized on" 
+	  @echo "         make command line. Proceeding with single precision. Use make"  
+	  @echo "         argument: precision=[single, double]"
+  endif 
+
 	@echo ""
-	@echo "WARNING: Floating point math precision not specified or not recognized on" 
-	@echo "         make command line. Proceeding with single precision. Use make"  
-	@echo "         argument: precision=[single, double]"
-endif 
-
-	@echo ""
+	@echo "Using application: $(application)"
 	@echo "Using digitizer: $(digitizer)"
-	@echo "Using switch: $(switch)"
+  ifeq ($(app), fastspec)
+	  @echo "Using switch: $(switch)"
+  endif
 	@echo "Using precision: $(precision)"
 	@echo ""
 	@echo "Building $@..."
@@ -147,6 +179,7 @@ endif
 
 # TARGET - install:  Copy executables to the INSTALL diectory
 install: $(TARGET)
+   
 	@echo "\nInstalling $(TARGET)..."
 	sudo cp $(TARGET) $(INSTALL)/$(TARGET)
 	sudo chmod 755 $(INSTALL)/$(TARGET)
@@ -156,6 +189,13 @@ install: $(TARGET)
 
 # TARGET -- clean:  Naively removes all likely files created by build
 clean:
+
+  ifdef ERROR_APP
+	  # Abort with error message
+	  $(error No application specified on make command line. Use make argument: \
+	    app=[fastspec, simplespec])
+  endif
+
 	@echo "\nRemoving build and install files for all $(TARGET_BASE) versions..."
 	rm -f *~ *.o $(TARGET_BASE) $(TARGET_BASE)_* 
 	sudo rm -f $(INSTALL)/$(TARGET_BASE) $(INSTALL)/$(TARGET_BASE)_*

@@ -6,6 +6,7 @@
 #include <pthread.h>
 #include "channelizer.h"
 #include "buffer.h"
+#include "accumulator.h"
 
 #if defined FFT_DOUBLE_PRECISION
   #define FFT_REAL_TYPE           double
@@ -29,9 +30,6 @@
   #error Aborted in pfb.h because FFT precision was not defined.
 #endif
 
-
-#define THREAD_SLEEP_MICROSECONDS 5
-
 using namespace std;
 
 class PFB : public Channelizer {
@@ -53,6 +51,7 @@ class PFB : public Channelizer {
     unsigned int                  m_uNumBuffers;
     unsigned int                  m_uNumReady;
     bool                          m_bStop;
+    bool                          m_bReturnInOrder;
     
     // Private helper functions
     void            process(Buffer::iterator&, 
@@ -66,7 +65,7 @@ class PFB : public Channelizer {
 
     // Constructor and destructor
     PFB( unsigned int, unsigned int, unsigned int, unsigned int, 
-         unsigned int );
+         unsigned int, bool );
     ~PFB();
 
     // Interface functions

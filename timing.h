@@ -19,6 +19,7 @@ class Timer {
 
     struct timespec     m_tic;
     double              m_dInterval;  // seconds
+    bool                m_bRunning;
  
   public:
 
@@ -35,38 +36,39 @@ class Timer {
       m_tic.tv_sec = 0; 
       m_tic.tv_nsec = 0; 
       m_dInterval = 0; 
+      m_bRunning = false;
     }      
     
     // Return the interval
     double get() const { return m_dInterval; }
 
-
+    bool running() const { return m_bRunning; }
+    
     // Start the timer
     void tic() { 
       clock_gettime(CLOCK_MONOTONIC, &m_tic);
-      m_dInterval = 0; } 
+      m_dInterval = 0; 
+      m_bRunning = true;
+    } 
 
 
     // Record the difference between now and tic().  Updates each time it is
     // called, always comparing to the original tic() time.
     double toc() { 
 
-      struct timespec toc;
-      clock_gettime(CLOCK_MONOTONIC, &toc); 
-        
-      // Calculate the difference between tic and toc in seconds
-      m_dInterval = (toc.tv_sec - m_tic.tv_sec) + (toc.tv_nsec - m_tic.tv_nsec) / 1e9; 
-      
-      // If there was no tic before our toc, throw it out
-      if (m_dInterval < 0) {
-        m_dInterval = 0;
-      }      
+      if (m_bRunning) {
+        struct timespec toc;
+        clock_gettime(CLOCK_MONOTONIC, &toc); 
+          
+        // Calculate the difference between tic and toc in seconds
+        m_dInterval = (toc.tv_sec - m_tic.tv_sec) + (toc.tv_nsec - m_tic.tv_nsec) / 1e9; 
+      }
 
       return m_dInterval;
     }
       
       
-    // Record the difference between now and tic.  Only updates if toc()
+    // Record the difference between now and tic.  Only updates if toc() or 
     // toc_if_first() hasn't already been called.  Subsequent calls to toc()
     // will overwrite this interval, but subsequent calls to toc_if_first()
     // will not.
@@ -100,6 +102,7 @@ class TimeKeeper {
     int     m_iHour;
     int     m_iMinutes;
     int     m_iSeconds;
+    long    m_iNanoSeconds;
     double  m_dSecondsSince1970;
 
   public:
@@ -107,7 +110,7 @@ class TimeKeeper {
     // Constructor and destructor
     TimeKeeper() : m_iYear(1970), m_iDayOfYear(1), 
                     m_iHour(0), m_iMinutes(0), m_iSeconds(0), 
-                    m_dSecondsSince1970(0) { }
+                    m_iNanoSeconds(0), m_dSecondsSince1970(0) { }
     
     ~TimeKeeper() { }
 
@@ -128,6 +131,10 @@ class TimeKeeper {
     friend bool operator<=(const TimeKeeper& lhs, const TimeKeeper& rhs) { return !(lhs > rhs); }
     friend bool operator>=(const TimeKeeper& lhs, const TimeKeeper& rhs) { return !(lhs < rhs); }
     friend bool operator!=(const TimeKeeper& lhs, const TimeKeeper& rhs) { return !(lhs == rhs); }
+    friend double operator-(const TimeKeeper& lhs, const TimeKeeper& rhs) 
+    { 
+      return (lhs.m_dSecondsSince1970 - rhs.m_dSecondsSince1970); 
+    }
 
 
     // Public functions
@@ -155,7 +162,7 @@ class TimeKeeper {
       return m_dSecondsSince1970;
     }
 
-
+/*
     // Set with the current system time
     double setNow() {
 
@@ -173,16 +180,34 @@ class TimeKeeper {
 
       return m_dSecondsSince1970;
     }
+*/  
 
-    int year() const { return m_iYear;}
+     // Set with the current system time
+    double setNow() {
+
+      struct timespec t;
+      clock_gettime(CLOCK_REALTIME, &t);
+      
+      m_dSecondsSince1970 = 0.0 + t.tv_sec + t.tv_nsec/1e9;
+      m_iNanoSeconds = t.tv_nsec;
+
+      getDateTimeFromSecondsSince1970(t.tv_sec, &m_iYear, &m_iDayOfYear, &m_iHour, &m_iMinutes, &m_iSeconds);
+
+      return m_dSecondsSince1970;
+    }   
+   
+
+    int year() const { return m_iYear; }
     
-    int doy() const { return m_iDayOfYear;}
+    int doy() const { return m_iDayOfYear; }
     
-    int hh() const { return m_iHour;}
+    int hh() const { return m_iHour; }
 
-    int mm() const { return m_iMinutes;}
+    int mm() const { return m_iMinutes; }
 
-    int ss() const { return m_iSeconds;}
+    int ss() const { return m_iSeconds; }
+    
+    int ns() const { return m_iNanoSeconds; }
 
     double secondsSince1970() const { return m_dSecondsSince1970; }
 
@@ -274,10 +299,14 @@ class TimeKeeper {
         sprintf(txt, "%04d_%03d_%02d_%02d", m_iYear, m_iDayOfYear, m_iHour, 
                 m_iMinutes);
         break;
-      default:
+      case 5:
         sprintf(txt, "%04d_%03d_%02d_%02d_%02d", m_iYear, m_iDayOfYear, m_iHour, 
                 m_iMinutes, m_iSeconds);
         break;
+      default:
+        sprintf(txt, "%04d_%03d_%02d_%02d_%02d_%03ld", m_iYear, m_iDayOfYear, m_iHour, 
+                m_iMinutes, m_iSeconds, m_iNanoSeconds / 1000000);
+        break;        
       }
       
       return std::string(txt);
@@ -305,9 +334,14 @@ class TimeKeeper {
         sprintf(txt, "%04d-%03d %02d:%02d", m_iYear, m_iDayOfYear, m_iHour, 
                 m_iMinutes);
         break;
-      default:
+      case 5:
         sprintf(txt, "%04d-%03d %02d:%02d:%02d", m_iYear, m_iDayOfYear, m_iHour, 
                 m_iMinutes, m_iSeconds);
+        break;
+      default:
+        sprintf(txt, "%04d-%03d %02d:%02d:%02d.%03ld", m_iYear, m_iDayOfYear, m_iHour, 
+                m_iMinutes, m_iSeconds, m_iNanoSeconds / 1000000);
+        break;        
       }
       
       return std::string(txt);

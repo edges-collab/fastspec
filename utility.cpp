@@ -212,6 +212,81 @@ bool write_plot_file( const string& sFilePath,
 
 
 
+
+// ----------------------------------------------------------------------------
+// append_accumulation_simple() -- Writes all three spectra from full switch cycle to 
+//                         ACQ file.  
+// ----------------------------------------------------------------------------
+bool append_accumulation_simple( const string& sFilePath, Accumulator* pAccum  )
+{
+
+  TimeKeeper startTime = pAccum->getStartTime();
+  bool bResult = true;
+
+  if (!make_path(get_path(sFilePath), 0775)) {
+    return false;
+  }
+
+  // Write spectrum
+
+  // Open the file for appending
+  if (!is_file(sFilePath.c_str())) {
+    printf ("Error appending to file.  File not found: %s\n", sFilePath.c_str());
+    return false;
+  }
+  
+  FILE *file = NULL;
+  if ((file = fopen (sFilePath.c_str(), "a")) == NULL) {
+    printf ("Error appending to file.  Cannot write to: %s\n", sFilePath.c_str());
+    return false;
+  }
+ 
+  unsigned int uit = 0;
+  unsigned long ult = 0;
+  int it = 0;
+  long lt = 0;
+  float ft = 0;
+  
+  it = startTime.year();
+  fwrite(&it, sizeof(it), 1, file);
+  it = startTime.doy();
+  fwrite(&it, sizeof(it), 1, file);
+  it = startTime.hh();
+  fwrite(&it, sizeof(it), 1, file);
+  it = startTime.mm();
+  fwrite(&it, sizeof(it), 1, file);
+  it = startTime.ss();
+  fwrite(&it, sizeof(it), 1, file);
+  lt = startTime.ns();
+  fwrite(&lt, sizeof(lt), 1, file);
+  
+  //ft = (float) pAccum->getStartFreq();
+  //fwrite(&ft, sizeof(ft), 1, file);
+  //ft = (float) pAccum->getStopFreq();
+  //fwrite(&ft, sizeof(ft), 1, file);  
+  uit = pAccum->getNumAccums();
+  fwrite(&uit, sizeof(uit), 1, file);  
+  ult = pAccum->getDrops();
+  fwrite(&ult, sizeof(ult), 1, file);  
+  ft = (float) pAccum->getADCmin();
+  fwrite(&ft, sizeof(ft), 1, file);
+  ft = (float) pAccum->getADCmax();
+  fwrite(&ft, sizeof(ft), 1, file);
+  uit = pAccum->getDataLength();
+  fwrite(&uit, sizeof(uit), 1, file);
+
+  fwrite(pAccum->getSum(), sizeof(ACCUM_DATA_TYPE), pAccum->getDataLength(), file);
+  
+  fclose(file);
+  
+  return bResult;
+
+}
+
+
+
+
+
 // ----------------------------------------------------------------------------
 // append_switch_cycle() -- Writes all three spectra from full switch cycle to 
 //                         ACQ file.  
